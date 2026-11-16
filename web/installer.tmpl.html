@@ -3,7 +3,7 @@
 <title>Install SLOOP 3 · public beta · M-VAVE FM-1</title>
 <meta name="description" content="Install SLOOP 3, the free groovebox firmware for the M-VAVE FM-1, from your browser in a few guided steps.">
 <meta name="theme-color" content="#0f1014">
-<link rel="icon" href="data:image/png;base64,__LOGO__">
+<link rel="icon" href="data:image/png;base64,__MARK__">
 <style>
 :root{--bg:#0f1014;--bg2:#14161b;--panel:#191b21;--panel2:#20232b;--line:#2b2f39;--line2:#383d49;--ink:#eef0f4;--ink2:#c9cdd6;--dim:#8d94a1;
 --acc:#fd5f18;--acc2:#ff8a4c;--ok:#3ddc84;--warn:#ffc940;--bad:#ff5d5d;--blue:#5aa8ff;--c1:#52a1ff;--c2:#52e67b;--c3:#ffcf40;--c4:#ec6ee1;--c5:#ff9229;
@@ -24,7 +24,7 @@ p{margin:10px 0}ol,ul{padding-left:22px;margin:10px 0}li{margin:6px 0}
 .top{position:sticky;top:0;z-index:20;background:rgba(15,16,20,.86);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;align-items:center;gap:14px;height:64px}
 .brand{display:flex;align-items:center;gap:10px;white-space:nowrap;color:var(--ink);text-decoration:none;font-weight:800;font-size:19px;letter-spacing:-.01em}
-.brand img{width:34px;height:34px}
+.brand img{width:36px;height:36px;object-fit:contain;flex:none}
 .badge{white-space:nowrap;display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;border-radius:999px;padding:3px 9px;line-height:1.4}
 .badge.beta{background:var(--warn);color:#1d1600}.badge.ver{background:var(--panel2);color:var(--ink2);border:1px solid var(--line2)}
 .top nav{margin-left:auto;display:flex;align-items:center;gap:4px}
@@ -161,7 +161,7 @@ footer a{color:var(--ink2)}
 </style></head><body>
 
 <header class="top"><div class="wrap">
-<a class="brand" href="#top"><img src="data:image/png;base64,__LOGO__" alt="">SLOOP 3</a>
+<a class="brand" href="#top"><img src="data:image/png;base64,__MARK__" alt="">SLOOP 3</a>
 <span class="badge beta" data-t="beta">Public beta</span><span class="badge ver">v__VERSION__</span>
 <nav aria-label="Links">
 <a class="opt" href="https://github.com/isod89/sloop3-fm1/blob/main/docs/GUIDE.md" data-t="navGuide">Guide</a>
@@ -262,7 +262,7 @@ footer a{color:var(--ink2)}
 <p data-t="w2a">Download <code>fm1-uboot.fwsc</code> from the <a href="https://github.com/jvitkauskas/m-bootloader/releases/latest" target="_blank" rel="noopener">latest m-bootloader release</a>, open it in M-UPGRADE (close other MIDI apps first) and start the upgrade. It writes only the bootloader. If in doubt, prefer M-Flasher, which also makes the full backup.</p>
 </div>
 </div>
-<div class="note warn"><b data-t="mbWarnT">Good to know</b><ul data-t="mbWarnB"><li>Keep the power on while the bootloader is written.</li><li>Newer FM-1s may have another flash chip, the <b>UCUN UC25HQ80</b> (JEDEC <code>0xB36014</code>), on which m-bootloader is little tested. If M-Flasher reports it, read the <a href="https://github.com/jvitkauskas/m-bootloader#status">status notes</a> first.</li><li>M-VAVE's official updates put their own bootloader back: after one, do this step again.</li></ul></div>
+<div class="note warn"><b data-t="mbWarnT">Good to know</b><ul data-t="mbWarnB"><li>Keep the power on while the bootloader is written.</li><li>FM-1s sold since fall 2026 have another flash chip, the <b>UCUN UC25HQ80</b> (JEDEC <code>0xB36014</code>). m-bootloader has not been run on it yet, and one such unit did not start after it was installed. Use <b>M-Flasher 0.9.1 or newer</b>, which warns you, and make its backup first. SLOOP 3 accepts this chip, but it has not been tried on one yet either.</li><li>M-VAVE's official updates put their own bootloader back: after one, do this step again.</li></ul></div>
 <button class="btn" id="mbDone" data-t="mbDone">Done: I see the menu now</button>
 </div>
 <div class="foot"><button class="btn ghost" data-back="1" data-t="back">← Back</button><div class="right"><button class="btn primary" id="n2" disabled data-t="cont">Continue</button></div></div>
@@ -437,7 +437,7 @@ fr: {
   w1e: 'Éteins et rallume le FM-1 en tenant <kbd>PLAY</kbd> : le menu apparaît.',
   w2tag: 'Autre possibilité · FM-1 avec le firmware de M-VAVE', w2T: 'Avec l\'application M-UPGRADE de M-VAVE',
   w2a: 'Télécharge <code>fm1-uboot.fwsc</code> depuis la <a href="https://github.com/jvitkauskas/m-bootloader/releases/latest" target="_blank" rel="noopener">dernière version de m-bootloader</a>, ouvre-le dans M-UPGRADE (ferme d\'abord les autres applis MIDI) et lance la mise à jour. Seul le bootloader est écrit. Dans le doute, préfère M-Flasher, qui fait aussi la sauvegarde complète.',
-  mbWarnT: 'Bon à savoir', mbWarnB: '<li>Garde l\'alimentation pendant l\'écriture du bootloader.</li><li>Les FM-1 récents peuvent avoir une autre puce flash, la <b>UCUN UC25HQ80</b> (JEDEC <code>0xB36014</code>), sur laquelle m-bootloader est peu testé. Si M-Flasher l\'indique, lis d\'abord les <a href="https://github.com/jvitkauskas/m-bootloader#status">notes d\'état</a>.</li><li>Les mises à jour officielles de M-VAVE remettent leur propre bootloader : après l\'une d\'elles, refais cette étape.</li>',
+  mbWarnT: 'Bon à savoir', mbWarnB: '<li>Garde l\'alimentation pendant l\'écriture du bootloader.</li><li>Les FM-1 vendus depuis l\'automne 2026 ont une autre puce flash, la <b>UCUN UC25HQ80</b> (JEDEC <code>0xB36014</code>). m-bootloader n\'a pas encore tourné dessus, et un de ces FM-1 n\'a pas redémarré après son installation. Utilise <b>M-Flasher 0.9.1 ou plus récent</b>, qui te prévient, et fais d\'abord sa sauvegarde. SLOOP 3 accepte cette puce, mais n\'a pas encore été essayé dessus non plus.</li><li>Les mises à jour officielles de M-VAVE remettent leur propre bootloader : après l\'une d\'elles, refais cette étape.</li>',
   mbDone: 'C\'est fait : je vois le menu',
   h3: 'Connecte ton FM-1', s3: 'Démarre le FM-1 en MIDI MODE, branche-le, et laisse la page le trouver.',
   c1: 'Éteins le FM-1, puis rallume-le en tenant <kbd>PLAY</kbd>.', c2: 'Dans le menu, choisis <b>MIDI MODE</b> avec <kbd>OCT-</kbd> / <kbd>OCT+</kbd>, puis appuie sur <kbd>PLAY</kbd>. L\'écran demande de brancher l\'USB.',
@@ -607,14 +607,28 @@ function attach(o, i) {
   if (inp) inp.onmidimessage = null;
   out = o; inp = i; inp.onmidimessage = onMsg;
 }
-const port = (re) => [[...midi.outputs.values()].find(p => re.test(p.name) && p.state !== 'disconnected'), [...midi.inputs.values()].find(p => re.test(p.name) && p.state !== 'disconnected')];
-function tryPort() {
-  const [o, i] = port(/FM-1 Update/i);
-  if (!o || !i) return false;
-  attach(o, i);
-  state = 'asking'; clearTimeout(hintT); show('err3', false); show('waiting', false); say(T.found + out.name + T.reading);
-  out.send(frame(0x12, []));
-  setTimeout(() => { if (state === 'asking') { state = 'waiting'; problem('err3', T.noans, T.noansFix); } }, 3000);
+/* m-bootloader's MIDI MODE: "FM-1 Update" until 2.2; from 2.3 it answers as M-VAVE's update loaders do,
+ * "ota-FM-1_900". Each port that may be it is asked who it is (0x12): the one that says MBOOT is used */
+const UPD = /FM-1 Update|ota-FM-1/i;
+function candidates() {
+  const outs = [...midi.outputs.values()].filter(p => UPD.test(p.name) && p.state !== 'disconnected');
+  const ins = [...midi.inputs.values()].filter(p => UPD.test(p.name) && p.state !== 'disconnected');
+  return outs.map(o => [o, ins.find(i => i.name === o.name) || ins[0]]).filter(x => x[1]);
+}
+let probing = false;
+async function tryPort() {
+  const cs = candidates();
+  if (!cs.length || probing) return cs.length > 0;
+  probing = true;
+  for (const [o, i] of cs) {
+    attach(o, i);
+    state = 'asking'; clearTimeout(hintT); show('err3', false); show('waiting', false); say(T.found + out.name + T.reading);
+    out.send(frame(0x12, []));
+    for (let w = 0; w < 30 && state === 'asking'; w++) await new Promise(r => setTimeout(r, 50));
+    if (state !== 'asking') { probing = false; return true; }          /* (it answered: ready, or refused) */
+  }
+  probing = false;
+  state = 'waiting'; show('waiting', true); problem('err3', T.noans, T.noansFix);
   return true;
 }
 $('con').onclick = async () => {
@@ -622,15 +636,15 @@ $('con').onclick = async () => {
     if (!navigator.requestMIDIAccess) { problem('err3', T.nomidi, ''); return; }
     try { midi = midi || await navigator.requestMIDIAccess({ sysex: true }); }
     catch (e) { problem('err3', T.denied, T.deniedFix); return; }
-    if (tryPort()) return;
+    if (await tryPort()) return;
     state = 'waiting'; show('waiting', true); show('device', false); show('err3', false);
     const st = $('status'); st.textContent = ''; st.className = 'status';
     const names = () => [...midi.outputs.values()].map(p => p.name);
-    const firmware = () => names().some(n => /SLOOP|Felucca|CRITICAL|FM-1|ota-/i.test(n) && !/FM-1 Update/i.test(n));
+    const firmware = () => names().some(n => /SLOOP|Felucca|CRITICAL|FM-1/i.test(n) && !UPD.test(n));
     if (firmware()) problem('err3', T.running, T.runningFix);
     clearTimeout(hintT);
     hintT = setTimeout(() => { if (state === 'waiting' && !firmware()) problem('err3', fmt(T.noport, { n: names().join(', ') || '—' }), T.noportFix); }, 8000);
-    midi.onstatechange = () => { if (state === 'waiting') setTimeout(() => { if (state === 'waiting' && !tryPort() && firmware()) problem('err3', T.running, T.runningFix); }, 400); };
+    midi.onstatechange = () => { if (state === 'waiting') setTimeout(async () => { if (state === 'waiting' && !(await tryPort()) && firmware()) problem('err3', T.running, T.runningFix); }, 400); };
   } catch (err) { problem('err3', T.err + err.message, ''); }
 };
 /* ---------------------------------------------------------------- keeping the screen on, the tab in front */

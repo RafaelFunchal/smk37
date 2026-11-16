@@ -7,7 +7,8 @@
  *   - mutes belong to the performance, not to the patterns: a pattern change keeps them;
  *   - undo / redo of every edit (a take, a step, a clear, a length), 16 deep;
  *   - live recording: a note is written where it was heard (the output's delay taken off), its length when the
- *     key is released; recording over a loop adds to it (overdub).
+ *     key is released; recording over a loop adds to it (overdub), a note played again where it already is
+ *     takes its place (3.3.7)
  * 1.0 adds, per step: parameter locks (a sound parameter another value for that step only), a condition (only in
  * a fill, never in a fill, a chance, or 1 in 2 / 3 / 4 loops), ratchets (2 to 4 hits in the step); fills (now, or
  * for the next bar); and the song: a live jam recorded as the bars where patterns and mutes changed, played back
@@ -74,6 +75,7 @@ typedef struct seq {
     uint64_t pos;                        /* absolute position, ticks << 16 */
     uint32_t tick;                       /* absolute tick of pos */
     uint8_t switch_now;                  /* a queued change waits for: 0 the next bar, 1 the current pattern's end */
+    uint8_t lead;                        /* (3.3.7) the track in the hands: with switch_now, its pattern's end is every track's */
     /* recording: the keys held, their notes' start */
     struct { uint8_t on, note, vel; uint32_t start; } held[SEQ_HELD];
     seq_hist *hist;                      /* undo / redo (kept apart: it is big), or none */

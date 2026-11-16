@@ -58,6 +58,8 @@ never had.
 - Per-track INSERT (SOFT, HARD, FOLD, FUZZ, CRUSH, PHASER, FLANGER, CHORUS) and SLICER; delay, reverb, chorus;
   **27 punch-in effects** (hold FX and play them like keys; FX + HOME locks the layer); DUST, DUCK and a DJ filter on
   the master; **TEXTURE** under the mix.
+- **The battery** as a thin line along the bottom of the screen (green, yellow, red; blue and running on a computer's
+  USB).
 - **The keys light up to guide you**: hold HOME (OPEN, NEW, SAVE), hold SAVE (your 8 patterns, dim to bright).
 - **SOUNDS**: every sound by category, each on a white key; 16 favourites; 32 sounds of your own.
 - A new interface in English, colour themes, and **six visualisers** (HOME on the tracks screen).

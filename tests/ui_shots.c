@@ -109,7 +109,9 @@ int main(void)
     for (int t = 0; t < 5; t++) for (int i = 0; i < 16; i++) v.cells[t][i] = (uint8_t)((P[t][i] == 'x' ? UC_NOTE : 0) | (i == 6 ? UC_PLAY : 0));
     v.cells[0][5] |= UC_LOCK; v.mute[4] = 1; v.solo[2] = 0; v.edited[1] = 1;
     knob(&v, 0, "SWING", "0", 0, 0); knob(&v, 1, "LEVEL", "81", 81, 0); knob(&v, 2, "STEPS", "16", 12, 0); knob(&v, 3, "PAN", "0", 50, 0);
+    v.batt = 72;                                   /* (3.3.6) the battery's line along the bottom */
     v.page = UI_TRACKS; shoot(&v, "01-tracks");
+    { ui_view u = v; u.batt = 22; shoot(&u, "01b-batt-22"); u.batt = 5; shoot(&u, "01c-batt-5"); u.batt_usb = 3; shoot(&u, "01d-batt-usb"); }
     v.recording = 1; v.rec[0] = 1; snprintf(v.status, sizeof v.status, "REC"); v.status_col = RGB(255, 80, 80);
     shoot(&v, "02-tracks-rec"); v.recording = 0; v.rec[0] = 0; snprintf(v.status, sizeof v.status, "P1→3"); v.status_col = RGB(255, 210, 60);
 

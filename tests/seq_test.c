@@ -450,10 +450,58 @@ static void accent_slide_test(void)
     CHECK(S.t[0].pat[0].n == n0 - 1 && !seq_step_has(&S, 0, 4, 60) && seq_step_has(&S, 0, 4, 64), "one note of the chord removed");
     seq_undo(&S); CHECK(seq_step_has(&S, 0, 4, 60), "and back with undo");
 }
+/* (3.3.7) a tester's report: "chords just stack with time going", "offset between two tracks with the same steps" */
+static int pos_of(int t) { return (int)seq_step_of(&S, t); }
+static void loop_stack_test(void)
+{
+    printf("3.3.7: a chord played again on each loop is written once; the patterns' changes keep the tracks together\n");
+    reset(120.0f);
+    seq_play(&S, 1); seq_record(&S, 1, 1);
+    static const int CH[3] = { 60, 64, 67 };
+    for (int loop = 0; loop < 4; loop++) {                 /* the same chord on steps 0 and 8, four times round, a little off */
+        for (int h = 0; h < 2; h++) {
+            uint32_t at = (uint32_t)loop * SEQ_BAR + (uint32_t)h * 8 * SEQ_TPS + (uint32_t)(loop * 7 % 23);
+            run_to(at); for (int i = 0; i < 3; i++) seq_key(&S, CH[i] + h * 2, 90, 1, 0);
+            run_to(at + 3 * SEQ_TPS); for (int i = 0; i < 3; i++) seq_key(&S, CH[i] + h * 2, 0, 0, 0);
+        }
+    }
+    run_to(4 * SEQ_BAR + 12 * SEQ_TPS); seq_key(&S, 72, 90, 1, 0); run_to(4 * SEQ_BAR + 13 * SEQ_TPS); seq_key(&S, 72, 0, 0, 0);
+    seq_record(&S, 0, 1);
+    CHECK(S.t[1].pat[0].n == 7, "the chords played 4 times: %d events (6, and the new note: 7)", S.t[1].pat[0].n);
+    seq_play(&S, 0);
+
+    /* all tracks to a pattern on an odd bar: the one already on it starts with the others */
+    reset(120.0f);
+    for (int t = 0; t < 2; t++) for (int p = 0; p < 2; p++) S.t[t].pat[p].steps = 32;
+    S.t[1].cur = 1;
+    seq_play(&S, 1);
+    run_to(2 * SEQ_BAR + 5 * SEQ_TPS);
+    seq_queue(&S, -1, 1);
+    run_to(3 * SEQ_BAR + 3 * SEQ_TPS);
+    CHECK(S.t[0].cur == 1 && S.t[1].cur == 1, "both on pattern 2 (%d %d)", S.t[0].cur + 1, S.t[1].cur + 1);
+    CHECK(pos_of(0) == pos_of(1) && pos_of(0) == 3, "32 steps each: steps %d and %d (3 and 3)", pos_of(0), pos_of(1));
+    /* every track already on it: nothing restarts */
+    seq_queue(&S, -1, 1);
+    CHECK(S.t[0].next == SEQ_NONE && S.t[1].next == SEQ_NONE, "a pattern every track is on: no change");
+    seq_play(&S, 0);
+
+    /* a chain (the current pattern's end): tracks of 16 and 12 steps change at the lead's end, together */
+    reset(120.0f);
+    S.t[1].pat[0].steps = 12; S.t[1].pat[1].steps = 12;
+    seq_play(&S, 1); S.switch_now = 1; S.lead = 0;
+    run_to(3 * SEQ_TPS);
+    seq_queue(&S, -1, 1);
+    run_to(SEQ_BAR - 1);
+    CHECK(S.t[0].cur == 0 && S.t[1].cur == 0, "nothing changed before the lead's end (%d %d)", S.t[0].cur, S.t[1].cur);
+    run_to(SEQ_BAR + 2 * SEQ_TPS);
+    CHECK(S.t[0].cur == 1 && S.t[1].cur == 1 && S.t[0].origin == S.t[1].origin, "together at the lead's end (origins %u %u)", S.t[0].origin, S.t[1].origin);
+    CHECK(pos_of(0) == 2 && pos_of(1) == 2, "steps %d and %d (2 and 2)", pos_of(0), pos_of(1));
+    seq_play(&S, 0);
+}
 int main(void)
 {
     add_test(); div_test();
-    timing_test(); polymeter_test(); switch_test(); record_test(); edit_test(); step_test(); song_test(); song_hand_test(); move_test(); lenmax_test(); put_test(); sloop_test(); accent_slide_test();
+    timing_test(); polymeter_test(); switch_test(); record_test(); edit_test(); step_test(); song_test(); song_hand_test(); move_test(); lenmax_test(); put_test(); sloop_test(); accent_slide_test(); loop_stack_test();
     printf("%d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

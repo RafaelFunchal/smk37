@@ -306,6 +306,27 @@ static void sc_pages(void)                    /* every button's pages, each draw
 static void sc_record(void)                   /* REC: notes played go in; SEQ steps; undo; save and back */
 {
     boot_wait();
+    /* 3.3.7: a tester's report: "when recording a chord loop, the chords stack up with time". A new project takes
+     * on the steps (QUANT ON, as SLOOP 2.8); the same chord played on 3 loops in a row is written once */
+    {
+        EXPECT(Q.t[trk].quant == 100, "a new project records as played, not on the steps (QUANT %d)", Q.t[trk].quant);
+        int n0 = seq_count(&Q, trk);
+        tap(B_PLAY); wait_ms(300); tap(B_REC); wait_ms(300);
+        uint32_t len = (uint32_t)Q.t[trk].pat[Q.t[trk].cur].steps * SEQ_TPS;
+        for (int pass = 0; pass < 3; pass++) {
+            uint32_t loop = Q.tick / len;
+            while (Q.tick / len == loop) wait_ms(1);          /* the loop's start */
+            wait_ms(30 + pass * 9);                            /* (a little later each time, as a hand plays) */
+            keydown(0); keydown(4); keydown(7); wait_ms(300); keyup(0); keyup(4); keyup(7); wait_ms(100);
+        }
+        tap(B_REC); wait_ms(300);
+        int n1 = seq_count(&Q, trk);
+        printf("[%8.3f]    a chord on 3 loops: %d events written\n", tw_s(), n1 - n0);
+        EXPECT(n1 - n0 == 3, "the same chord on 3 loops: %d events (3)", n1 - n0);
+        press(B_EDIT); tap(B_OCTD); release(B_EDIT); wait_ms(300);   /* (the take undone) */
+        EXPECT(seq_count(&Q, trk) == n0, "the chord's take not undone (%d)", seq_count(&Q, trk));
+        tap(B_PLAY); wait_ms(500);
+    }
     tap(B_PLAY); wait_ms(500);
     tap(B_REC); wait_ms(300);
     for (int i = 0; i < 8; i++) { tapkey(i * 2); wait_ms(150); }

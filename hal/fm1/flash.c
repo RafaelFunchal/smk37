@@ -121,6 +121,9 @@ int flash_open(void)
         if ((s1 & 0x7Cu) || (s2 & 0x40u)) {
             wren(); command(0x01); xfer((uint8_t)(s1 & ~0x7Fu), 0); xfer((uint8_t)(s2 & ~0x40u), 0); cs(1);
             if (wait_ready(100)) r = -1;
+            /* (3.3.7) a part whose 01 takes status 1 alone (the FM-1's newer UCUN UC25HQ80 is not documented here):
+             * status 2 by 31, QE and the rest kept (m-bootloader docs/SPEC.md 3.4: 31 writes status 2 alone) */
+            else if (status(0x35) & 0x40u) { uint8_t t2 = status(0x35); wren(); command(0x31); xfer((uint8_t)(t2 & ~0x40u), 0); cs(1); if (wait_ready(100)) r = -1; }
             else if ((status(0x05) & 0x7Cu) || (status(0x35) & 0x40u)) r = -1;
         }
     }

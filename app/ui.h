@@ -83,6 +83,7 @@ typedef struct {
     const char *toast; uint8_t toast_kind;
     const char *info;                              /* 3.3: what just changed: in the page's own title line, nothing covered */
     uint8_t saving, save_pct;
+    uint8_t batt, batt_usb;                        /* (3.3.6) the battery: 0..100 % (255: not read yet); USB: 1..8, the light's step */
 } ui_view;
 
 void ui_draw(const ui_view *v);

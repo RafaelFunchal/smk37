@@ -97,10 +97,10 @@ async function install() {
     process.exit(fails ? 1 : 0);
   }, 50);
 }
-plug('FM-1 Update', mb);
+plug('ota-FM-1_900', mb);                                  /* (m-bootloader 2.3's MIDI MODE answers as M-VAVE's update loaders) */
 (async () => {
   await els.con.onclick();
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise(r => setTimeout(r, 200));
   check(logs.some(l => /m-bootloader v1.2/.test(l)), 'identity read: ' + logs.join(' | '));
   check(els.go.disabled, 'Install waits for a backup');
   els.haveBak.checked = true; els.haveBak.onchange();

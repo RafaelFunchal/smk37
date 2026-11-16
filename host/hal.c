@@ -368,4 +368,5 @@ int trs_midi_byte(void) { return -1; }
 uint32_t trs_midi_count(void) { return 0; }
 int tw_pot = 512;
 void adc_init(void) { }
-int32_t adc_read(uint32_t ch) { (void)ch; adv(200000); return tw_pot; }
+int32_t tw_batt = 600;                     /* (3.3.6) the battery's ADC: 4.06 V, about 85 % */
+int32_t adc_read(uint32_t ch) { adv(200000); return ch == 3u ? tw_batt : tw_pot; }   /* (ch 3: ADC_CH_BATT) */

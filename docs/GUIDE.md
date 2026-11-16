@@ -63,6 +63,12 @@ SLOOP 2.8 is still there.
 
 ## What is new or has moved
 
+**Recording (3.3.7).** A new project records **on the steps** (QUANT ON), as SLOOP 2.8 did. To keep your notes exactly
+where you played them: REC armed while stopped (REC READY), KNOB 4 **QUANT OFF**. Recording over a loop adds the notes
+you play; **a note played again where it already is takes its place**, so a chord played on every loop is written
+once. Changing every track's pattern (or a chain, or the song) starts **all the tracks together**, so tracks of the
+same length never drift apart.
+
 **Messages come in two kinds:**
 
 - **What just changed** (a mode, a value, a sound's name, a hint: KEY E MIN, PATTERN 3 ON THE BAR, TAKE 3.4s…) is
@@ -157,6 +163,16 @@ in place of the page.
 
 During a save (or a transfer from the editor), the visualiser freezes for a fraction of a second: its working memory
 is the saves', lent when it is free.
+
+## The battery
+
+A thin line along the **bottom of the screen** shows the battery, on every page and on the visualiser: as long as
+the charge left. **Green**, then **yellow** under 30 %, **red** under 15 %, and it **blinks** under 8 %: time to
+plug the FM-1 in. It is worked out from the battery's voltage, so it reads a few % lower while the music plays, and
+it moves slowly (it is smoothed, once a second).
+
+Plugged into a **computer**, the FM-1 is powered and charged by the USB: the line turns **blue** and a light runs
+along it. (On a wall charger, the line shows the level, a little high while it charges.)
 
 ## SLICE: a sample in slices
 

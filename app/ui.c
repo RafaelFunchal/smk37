@@ -241,8 +241,8 @@ static void footer(const ui_view *v)
         if (k->dial && k->bar >= 0) dial(x + 30, top + 12, 12, 4, k->bar, kc, k->hot ? YEL : TXT);
         else if (k->dial) gfx_rframe(x + 18, top, 24, 24, 12, 2, gfx_mix(BG, kc, 12));
         else gfx_rfill(x + 8, top + 9, 44, 5, 2, kc);
-        fit(&font_s, x + 2, top + 27, 56, font_s.cap, k->label, k->hot ? YEL : DIM, 1);
-        fit(&font_m, x + 2, top + 42, 56, font_m.cap, k->value, k->hot ? YEL : TXT, 1);
+        fit(&font_s, x + 2, top + 26, 56, font_s.cap, k->label, k->hot ? YEL : DIM, 1);
+        fit(&font_m, x + 2, top + 40, 56, font_m.cap, k->value, k->hot ? YEL : TXT, 1);   /* (3.3.6: 2 px up, the battery's line under) */
     }
 }
 
@@ -791,9 +791,29 @@ static void toast(const ui_view *v)                       /* (3.1.2, as Sam aske
     fit(&font_s, 10, 23, 220, 17, b, TXT, 1);
 }
 
+/* (3.3.6) the battery: a line 2 px high along the bottom of the screen, as full as the battery (green, yellow under
+ * 30 %, red under 15 %, blinking under 8 %); a computer on the USB powers and charges it: a light runs along */
+#define BATT_H 2
+static void batt_bar(const ui_view *v)
+{
+    if ((v->batt > 100 && !v->batt_usb) || !gfx_visible(0, GFX_H - BATT_H, GFX_W, BATT_H)) return;
+    int y = GFX_H - BATT_H;
+    uint16_t track = gfx_mix(BG, DIM, 9);
+    if (v->batt_usb) {
+        gfx_fill(0, y, GFX_W, BATT_H, gfx_mix(BG, CYAN, 9));
+        int x = ((v->batt_usb - 1) & 7) * 40 - 40;
+        gfx_fill(x, y, 60, BATT_H, gfx_mix(BG, CYAN, 22)); gfx_fill(x + 15, y, 30, BATT_H, CYAN);
+        return;
+    }
+    int w = (v->batt * GFX_W + 50) / 100;
+    uint16_t c = v->batt >= 30 ? gfx_mix(BG, GREEN, 24) : v->batt >= 15 ? YEL : RED;
+    if (v->batt < 8 && !v->blink) c = track;
+    gfx_fill(0, y, w, BATT_H, c);
+    gfx_fill(w, y, GFX_W - w, BATT_H, track);
+}
 void ui_draw(const ui_view *v)
 {
-    if (v->page == UI_VIS) { vis_draw(); if (v->info && gfx_visible(0, 0, GFX_W, 26)) info_line(v, 0, 0, GFX_W, 26); toast(v); return; }
+    if (v->page == UI_VIS) { vis_draw(); if (v->info && gfx_visible(0, 0, GFX_W, 26)) info_line(v, 0, 0, GFX_W, 26); batt_bar(v); toast(v); return; }
     if (v->page == UI_SPLASH) { vis_splash_draw(); return; }
     gfx_fill(0, 0, GFX_W, GFX_H, BG);
     if (v->page == UI_LAYER) { layer_title(v); tiles(v); }
@@ -826,5 +846,6 @@ void ui_draw(const ui_view *v)
     }
     footer(v);
     if (v->info && (v->page == UI_DRUMS || v->page == UI_SONG || v->page == UI_NOTES) && gfx_visible(0, 0, GFX_W, 26)) info_line(v, 0, 0, GFX_W, 26);
+    batt_bar(v);
     toast(v);
 }

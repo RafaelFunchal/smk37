@@ -74,7 +74,7 @@
 #include "../hal/fm1/uart.h"
 #include "../hal/fm1/irq.h"
 
-#define VERSION "3.3.6"
+#define VERSION "3.3.7"
 /* COLD: a function of the interface, run from the flash window (fw/ram.ld .xtext); never called while the window is
  * off (a save's flash work: fw/main.c's loop runs only the sound, the panel and the flash then) */
 #define COLD __attribute__((section(".xtext.main")))
@@ -565,6 +565,7 @@ COLD static void new_project(int with_loop)
 {
     seq_init(&Q, rate_hz, 92.0f, &HIST);
     Q.note_on = sq_on; Q.note_off = sq_off; Q.locks = sq_locks;
+    for (int t = 0; t < NTRK; t++) Q.t[t].quant = 100;   /* (3.3.7) a take on the steps, as SLOOP 2.8 recorded (QUANT OFF: as played) */
     static const float LVL[NTRK] = { 0.45f, 0.45f, 0.4f, 0.85f, 0.3f };   /* (the sounds' own levels: presets.c) */
     /* SLOOP's: 808 BOOM, RHODES, LOFI FLUTE (SAMPLE); the kit; a pad on track 5 (SLOOP's engine order, place) */
     static const uint8_t SOUND0[NTRK][2] = { { 0, 0 }, { 1, 0 }, { 4, 5 }, { 0xFF, 0 }, { 0, 13 } };
@@ -1030,6 +1031,27 @@ COLD static void sb_view(ui_view *v)                    /* SOUNDS: the category,
     if (drum) v->knob[3].label = 0; else knob(v, 3, "FAV", isfav ? "REMOVE" : "ADD", -1, 0);
     for (int i = 0; i < 4; i++) v->knob[i].dial = 0;
 }
+/* (3.3.6) the battery: ADC channel 3 through the FM-1's divider, 147.7 a volt (M-VAVE's own three bars sit at 531 /
+ * 561 / 591: 3.6 / 3.8 / 4.0 V), smoothed; then the charge a Li-ion cell holds at that voltage (at rest: playing, it
+ * reads a few % low), shown with 2 % of hysteresis */
+static int32_t batt_raw; static int8_t batt_pct = -1;
+COLD static int batt_of(int32_t raw)
+{
+    static const uint16_t MV[12] = { 3300, 3400, 3500, 3600, 3650, 3700, 3750, 3800, 3900, 4000, 4100, 4200 };
+    static const uint8_t PC[12] = { 0, 2, 5, 12, 20, 30, 40, 50, 65, 80, 90, 100 };
+    int32_t mv = raw * 677 / 100;
+    if (mv <= MV[0]) return 0;
+    for (int i = 1; i < 12; i++) if (mv < MV[i]) return PC[i - 1] + (PC[i] - PC[i - 1]) * (mv - MV[i - 1]) / (MV[i] - MV[i - 1]);
+    return 100;
+}
+COLD static void batt_poll(void)
+{
+    int32_t b = adc_read(ADC_CH_BATT);
+    if (b <= 0) return;
+    batt_raw = batt_raw ? batt_raw + (b - batt_raw) / 8 : b;
+    int p = batt_of(batt_raw);
+    if (batt_pct < 0 || p > batt_pct + 1 || p < batt_pct - 1) batt_pct = (int8_t)p;
+}
 COLD static void fill_view(ui_view *v)
 {
     if (splash_on) { v->page = UI_SPLASH; return; }
@@ -1037,6 +1059,8 @@ COLD static void fill_view(ui_view *v)
     char b[40], *p;
     v->ntrk = NTRK; v->trk = POS[trk];
     v->blink = (uint8_t)((now / (250000u * lsb)) & 1u);
+    v->batt = batt_pct < 0 ? 255u : (uint8_t)batt_pct;
+    v->batt_usb = usb_midi_ready() ? (uint8_t)(1u + ((now / (250000u * lsb)) & 7u)) : 0u;   /* (a computer: it powers and charges) */
     v->bpm = (uint16_t)(Q.bpm + 0.5f);
     v->bar = (uint16_t)(Q.tick / SEQ_BAR + 1u); v->beat = (uint8_t)(Q.tick / (4 * SEQ_TPS) % 4u + 1u);
     v->playing = (uint8_t)Q.playing; v->recording = (uint8_t)Q.recording; v->armed = (uint8_t)recording_armed;
@@ -3970,6 +3994,7 @@ COLD __attribute__((noinline)) static void ui_round(void)
     }
     if ((uint32_t)(now - t_pot) > 20000u * lsb) {
         t_pot = now;
+        static uint8_t batt_n = 49; if (++batt_n >= 50) { batt_n = 0; batt_poll(); }   /* (3.3.6) the battery, once a second */
         int pot = adc_read(ADC_CH_MASTER);
         if (pot >= 0 && ed_mst >= 0 && (pot > ed_mst_pot + 40 || pot < ed_mst_pot - 40)) ed_mst = -1;   /* (the knob turned: back to it) */
         if (pot >= 0 && ed_mst < 0) { float x = (float)pot * (1.0f / 1023.0f); sm_set(&S.master, 0.5f * x * x); ed_mst_pot = pot; }
@@ -4288,7 +4313,7 @@ int app_main(uint32_t arg)
             if ((uint32_t)(time_ticks() - t_ui) < 60000u * lsb) continue;
         }
         if (chain_on && chain_n >= 2 && Q.playing && !Q.song_play) {   /* (the quick chain: in RAM, a save does not stop it) */
-            int rt = scope_one ? trk : 0;
+            int rt = scope_one ? trk : 0; Q.lead = (uint8_t)rt;          /* (3.3.7: its pattern's end is the change point) */
             if (Q.t[rt].next == SEQ_NONE) { chain_pos = (uint8_t)((chain_pos + 1u) % chain_n); seq_queue(&Q, scope_one ? trk : -1, chain[chain_pos]); }
         }
         if (saving) {                                       /* a save: one flash operation at a time, never a wait */
