@@ -1,0 +1,9 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  pc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The PC tests (sound, sequencer, saves, import, MIDI, screens)
+        run: make test

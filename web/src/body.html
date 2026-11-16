@@ -1,0 +1,37 @@
+<div id="top">
+  <div id="logo">SLOOP <span>3</span> <small class="dim" data-t="editor"></small></div>
+  <button class="btn pri" id="con" data-t="connect"></button>
+  <div id="stat">
+    <span class="chip"><span data-t="fw"></span> <b id="s_ver">-</b></span>
+    <span class="chip">P<b id="s_proj">-</b></span>
+    <span class="chip"><b id="s_play">■</b> <b id="s_pos">-</b></span>
+    <span class="chip"><b id="s_bpm">-</b> BPM</span>
+    <span class="chip">CPU <b id="s_cpu">-</b></span>
+    <span id="devmsg"></span>
+  </div>
+  <span class="grow"></span>
+  <button class="btn sm" id="b_view"></button>
+  <button class="btn sm" id="b_full"></button>
+  <button class="btn sm" id="b_lang">FR</button>
+</div>
+<div id="app">
+  <nav id="tabs"></nav>
+  <div id="main">
+    <section class="tab" id="tab_live"></section>
+    <section class="tab" id="tab_sound"></section>
+    <section class="tab" id="tab_seq"></section>
+    <section class="tab" id="tab_mixer"></section>
+    <section class="tab" id="tab_song"></section>
+    <section class="tab" id="tab_library"></section>
+    <section class="tab" id="tab_samples"></section>
+    <section class="tab" id="tab_kits"></section>
+    <section class="tab" id="tab_drumsynth"></section>
+    <section class="tab" id="tab_fm6"></section>
+    <section class="tab" id="tab_projects"></section>
+    <section class="tab" id="tab_settings"></section>
+    <section class="tab" id="tab_theme"></section>
+  </div>
+</div>
+<div id="log"></div>
+<div id="locked"><button class="btn big" id="b_unlock"></button></div>
+<input type="file" id="file" style="display:none"><input type="file" id="syxfile" style="display:none" accept=".syx,application/octet-stream"><input type="file" id="files" style="display:none" multiple accept="audio/*,.wav">

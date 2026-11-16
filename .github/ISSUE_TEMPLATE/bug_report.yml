@@ -1,0 +1,67 @@
+name: Bug report (SLOOP 3 beta)
+description: Something in SLOOP 3 doesn't work as it should.
+title: "[3.x.x] "
+labels: ["bug", "beta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing the SLOOP 3 public beta! A good report gets fixed fast.
+        Using **SLOOP 2.8**? Please report it in [its own repository](https://github.com/isod89/sloop-fm1/issues) instead.
+  - type: input
+    id: version
+    attributes:
+      label: SLOOP version
+      description: Tap HOME on the FM-1: the version is on the PROJECT page.
+      placeholder: "3.3.6"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - The installer page
+        - The sound (engines, effects, kits)
+        - The sequencer (patterns, steps, recording, song)
+        - Saving and projects
+        - The panel (buttons, keys, knobs, lights)
+        - The screen
+        - The web editor
+        - MIDI or USB audio
+        - A freeze or a restart
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, step by step, what you expected, and what happened instead.
+      placeholder: |
+        1. ...
+        2. ...
+        Expected: ...
+        Instead: ...
+    validations:
+      required: true
+  - type: textarea
+    id: screen
+    attributes:
+      label: What the screen showed
+      description: |
+        Any message, exactly as written. After a freeze or a restart, the first message says where it was (FROZE IN … / RESTART IN …): please copy it.
+        HOME also shows the load (CPU, PEAK, LATE). A photo helps.
+  - type: dropdown
+    id: often
+    attributes:
+      label: How often
+      options:
+        - Every time
+        - Sometimes
+        - Once
+  - type: input
+    id: computer
+    attributes:
+      label: Computer and browser (for the installer or the editor)
+      placeholder: "Windows 11, Chrome 131"

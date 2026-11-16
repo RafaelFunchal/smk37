@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Install SLOOP 3 · public beta · M-VAVE FM-1</title>
+<meta name="description" content="Install SLOOP 3, the free groovebox firmware for the M-VAVE FM-1, from your browser in a few guided steps.">
+<meta name="theme-color" content="#0f1014">
+<link rel="icon" href="data:image/png;base64,__LOGO__">
+<style>
+:root{--bg:#0f1014;--bg2:#14161b;--panel:#191b21;--panel2:#20232b;--line:#2b2f39;--line2:#383d49;--ink:#eef0f4;--ink2:#c9cdd6;--dim:#8d94a1;
+--acc:#fd5f18;--acc2:#ff8a4c;--ok:#3ddc84;--warn:#ffc940;--bad:#ff5d5d;--blue:#5aa8ff;--c1:#52a1ff;--c2:#52e67b;--c3:#ffcf40;--c4:#ec6ee1;--c5:#ff9229;
+--r:14px;--sh:0 1px 0 rgba(255,255,255,.04) inset,0 18px 50px rgba(0,0,0,.35)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--blue);text-underline-offset:3px}
+a:hover{color:#8cc3ff}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:8px}
+code,kbd{font:13.5px ui-monospace,"SF Mono",Consolas,monospace;background:var(--panel2);border-radius:6px;padding:1px 6px}
+kbd{border:1px solid var(--line2);border-bottom-width:3px;font-weight:700;color:#fff;font-family:Inter,system-ui,sans-serif;font-size:13px;letter-spacing:.03em}
+h1,h2,h3{letter-spacing:-.015em;line-height:1.2}
+p{margin:10px 0}ol,ul{padding-left:22px;margin:10px 0}li{margin:6px 0}
+.dim{color:var(--dim)}.small{font-size:14px}.hide{display:none!important}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+/* ---- the top bar */
+.top{position:sticky;top:0;z-index:20;background:rgba(15,16,20,.86);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:64px}
+.brand{display:flex;align-items:center;gap:10px;white-space:nowrap;color:var(--ink);text-decoration:none;font-weight:800;font-size:19px;letter-spacing:-.01em}
+.brand img{width:34px;height:34px}
+.badge{white-space:nowrap;display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;border-radius:999px;padding:3px 9px;line-height:1.4}
+.badge.beta{background:var(--warn);color:#1d1600}.badge.ver{background:var(--panel2);color:var(--ink2);border:1px solid var(--line2)}
+.top nav{margin-left:auto;display:flex;align-items:center;gap:4px}
+.top nav a{color:var(--ink2);text-decoration:none;font-size:14px;font-weight:600;padding:8px 11px;border-radius:9px}
+.top nav a:hover{background:var(--panel2);color:#fff}
+.lang{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-left:6px}
+.lang button{all:unset;cursor:pointer;font-size:12.5px;font-weight:800;padding:6px 10px;color:var(--dim)}
+.lang button[aria-pressed=true]{background:var(--panel2);color:#fff}
+@media(max-width:860px){.top nav a.opt{display:none}}
+@media(max-width:480px){.top .badge.ver{display:none}.top .wrap{gap:10px;padding:0 16px}}
+.stripe{height:3px;background:linear-gradient(90deg,var(--c1) 0 20%,var(--c2) 20% 40%,var(--c3) 40% 60%,var(--c4) 60% 80%,var(--c5) 80%)}
+/* ---- the hero */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center;padding:52px 0 34px}
+.hero h1{font-size:48px;margin:14px 0 0;font-weight:800}
+.hero h1 span{background:linear-gradient(90deg,var(--acc),var(--c3));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lead{font-size:19px;color:var(--ink2);margin:16px 0 0;max-width:34em}
+.facts{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 0;padding:0;list-style:none;color:var(--ink2);font-size:14.5px}
+.facts li{display:flex;align-items:center;gap:8px;margin:0}
+.facts svg{color:var(--acc2)}
+.shot{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--sh);aspect-ratio:1000/574;background:#160c1e}
+.shot img{display:block;width:100%;height:100%;object-fit:cover}
+.shot .cap{position:absolute;left:14px;bottom:12px;font-size:12px;color:rgba(255,255,255,.75);background:rgba(0,0,0,.45);padding:3px 9px;border-radius:999px}
+@media(max-width:900px){.hero{grid-template-columns:1fr;gap:28px;padding-top:34px}.hero h1{font-size:38px}}
+/* ---- the system check */
+.checks{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 0}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;border:1px solid var(--line2);background:var(--panel);border-radius:999px;padding:6px 13px 6px 9px;color:var(--ink2)}
+.chk i{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:900;color:#06200f;background:var(--ok)}
+.chk.no i{background:var(--bad);color:#2a0606}.chk.no{border-color:#6b2a2a;color:#ffd6d6}
+.blocker{margin:18px 0 0;border:1px solid #6b2a2a;background:#241315;border-radius:var(--r);padding:16px 18px}
+.blocker b{color:#ffb3b3}
+/* ---- the wizard */
+.wizard{display:grid;grid-template-columns:280px 1fr;gap:28px;align-items:start;margin:26px 0 10px}
+.rail{position:sticky;top:88px;list-style:none;margin:0;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:18px}
+.rail li{margin:0}
+.rail button{all:unset;box-sizing:border-box;display:flex;gap:12px;align-items:center;width:100%;padding:11px 10px;border-radius:12px;cursor:pointer;color:var(--dim)}
+.rail button:disabled{cursor:default}
+.rail button:not(:disabled):hover{background:var(--panel2)}
+.rail .n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;border:2px solid var(--line2);color:var(--dim)}
+.rail .t{font-weight:700;font-size:14.5px;line-height:1.25}.rail .t small{display:block;font-weight:500;font-size:12.5px;color:var(--dim);margin-top:2px}
+.rail li.now button{background:var(--panel2);color:#fff}.rail li.now .n{border-color:var(--acc);color:#fff;background:var(--acc)}
+.rail li.done button{color:var(--ink2)}.rail li.done .n{border-color:var(--ok);background:var(--ok);color:#06200f}
+.rail li.done .n::before{content:"✓"}.rail li.done .n span{display:none}
+.rail .line{width:2px;height:10px;background:var(--line2);margin:0 0 0 24px}
+@media(max-width:900px){.wizard{grid-template-columns:1fr}.rail{position:static;display:flex;overflow-x:auto;gap:4px;padding:8px}.rail .line{display:none}.rail button{padding:8px}.rail .t small{display:none}.rail .t{font-size:13px;white-space:nowrap}}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:30px 32px;box-shadow:var(--sh);min-height:420px;animation:in .25s ease}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pane .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--acc2)}
+.pane h2{font-size:28px;margin:6px 0 4px;font-weight:800}
+.pane .sub{color:var(--ink2);margin:0 0 18px;font-size:16.5px}
+@media(max-width:600px){.pane{padding:22px 18px}.pane h2{font-size:24px}}
+.foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:26px;padding-top:20px;border-top:1px solid var(--line)}
+.foot .right{display:flex;gap:10px;margin-left:auto}
+/* buttons */
+.btn{font:inherit;font-size:16px;font-weight:700;border-radius:12px;padding:12px 20px;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);display:inline-flex;align-items:center;gap:9px;text-decoration:none;transition:filter .15s,transform .05s,background .15s}
+.btn:hover:not(:disabled){filter:brightness(1.18);color:var(--ink)}.btn:active:not(:disabled){transform:translateY(1px)}
+.btn.primary{background:linear-gradient(180deg,#ff6a26,#f05410);border-color:#ff7a3d;color:#fff;box-shadow:0 8px 24px rgba(253,95,24,.25)}
+.btn.primary:hover:not(:disabled){color:#fff}
+.btn.big{font-size:18px;padding:16px 28px;border-radius:14px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--ink2)}.btn.ghost:hover:not(:disabled){background:var(--panel2)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+/* notes and lists */
+.note{border-radius:12px;padding:14px 16px;margin:16px 0;background:var(--bg2);border:1px solid var(--line);border-left:4px solid var(--line2);font-size:15px}
+.note.warn{border-left-color:var(--warn)}.note.safe{border-left-color:var(--ok)}.note.info{border-left-color:var(--blue)}.note.bad{border-left-color:var(--bad);background:#1d1214}
+.note>b:first-child{color:#fff;display:block;margin-bottom:2px}
+.note ul{margin:6px 0 0}
+.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0}
+.steps>li{counter-increment:s;position:relative;padding:0 0 0 44px;margin:14px 0}
+.steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:9px;background:var(--panel2);border:1px solid var(--line2);display:grid;place-items:center;font-weight:800;font-size:14px;color:var(--ink2)}
+.check{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--bg2);margin:10px 0;cursor:pointer}
+.check:hover{border-color:var(--line2)}
+.check input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--acc);flex:none}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+@media(max-width:640px){.choices{grid-template-columns:1fr}}
+.choice{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line2);background:var(--bg2);border-radius:16px;padding:18px 18px 16px;display:block;transition:border-color .15s,background .15s}
+.choice:hover{border-color:var(--acc2)}.choice[aria-pressed=true]{border-color:var(--acc);background:#22160f}
+.choice b{display:block;font-size:17px;color:#fff;margin-bottom:4px}.choice span{color:var(--ink2);font-size:14.5px}
+.choice .ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;margin-bottom:12px;background:var(--panel2);font-size:18px}
+.media{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:center;margin:8px 0}
+@media(max-width:760px){.media{grid-template-columns:1fr}}
+.media img{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+.ways{display:grid;gap:12px;margin:12px 0}
+.way{border:1px solid var(--line);background:var(--bg2);border-radius:14px;padding:16px 18px}
+.way.rec{border-color:#2c6a45}
+.way .tag{font-size:11.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}.way.rec .tag{color:var(--ok)}
+.way h3{margin:4px 0 6px;font-size:17px}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.links a{border:1px solid var(--line2);border-radius:9px;padding:6px 12px;text-decoration:none;font-size:14px;font-weight:600;color:var(--ink)}
+.links a:hover{border-color:var(--blue)}
+details.more{margin:12px 0;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}
+details.more>summary{cursor:pointer;padding:12px 16px;font-weight:700;list-style:none;display:flex;align-items:center;gap:10px}
+details.more>summary::before{content:"›";font-size:20px;line-height:1;transition:transform .15s;color:var(--dim)}
+details.more[open]>summary::before{transform:rotate(90deg)}
+details.more>div{padding:0 16px 14px}
+/* the device card, the progress */
+.device{display:flex;gap:16px;align-items:center;border:1px solid #2c6a45;background:#11201a;border-radius:14px;padding:14px 16px;margin:16px 0}
+.device .dot{width:12px;height:12px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px rgba(61,220,132,.18);flex:none}
+.device b{color:#fff}.device .meta{color:var(--ink2);font-size:14px}
+.wait{display:flex;gap:14px;align-items:center;border:1px dashed var(--line2);border-radius:14px;padding:14px 16px;margin:16px 0;color:var(--ink2)}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--acc);animation:sp 0.9s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.status{margin:16px 0 0;font-weight:600;min-height:1.6em;color:var(--ink2)}
+.status.ok{color:var(--ok)}.status.bad{color:var(--bad)}
+.prog{margin:18px 0 6px}
+.prog .row{display:flex;justify-content:space-between;font-size:14px;color:var(--ink2);margin-bottom:8px;font-variant-numeric:tabular-nums}
+.prog .row b{color:#fff;font-size:15px}
+.bar{height:12px;background:var(--panel2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--c3));border-radius:99px;transition:width .25s}
+.phases{display:flex;gap:8px;margin:14px 0 0;flex-wrap:wrap}
+.phase{font-size:13px;font-weight:700;border:1px solid var(--line2);border-radius:999px;padding:5px 12px;color:var(--dim)}
+.phase.now{border-color:var(--acc);color:#fff;background:#2a170d}.phase.done{border-color:#2c6a45;color:var(--ok)}
+.summary{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--bg2);margin:14px 0;font-size:15px}
+.summary dt{color:var(--dim)}.summary dd{margin:0;color:#fff;font-weight:600}
+.big-ok{width:76px;height:76px;border-radius:50%;background:var(--ok);display:grid;place-items:center;margin:4px 0 14px;box-shadow:0 0 0 10px rgba(61,220,132,.14)}
+.big-ok svg{width:40px;height:40px;color:#06200f}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+@media(max-width:760px){.cards{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);background:var(--bg2);border-radius:14px;padding:16px}
+.card b{display:block;color:#fff;margin-bottom:4px}.card p{margin:0;color:var(--ink2);font-size:14.5px}
+#log{background:#0b0c0f;border:1px solid var(--line);border-radius:10px;padding:12px 14px;max-height:240px;overflow:auto;white-space:pre-wrap;font:12.5px/1.55 ui-monospace,Consolas,monospace;color:#b9bec9;margin-top:8px}
+#log .ok{color:var(--ok)}#log .bad{color:var(--bad)}
+/* help, footer */
+.help{margin:46px 0 0}
+.help h2{font-size:26px;margin:0 0 4px}
+.faq{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:16px 0}
+@media(max-width:760px){.faq{grid-template-columns:1fr}}
+.faq details{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:0}
+.faq summary{cursor:pointer;padding:13px 16px;font-weight:700;font-size:15px}
+.faq details>div{padding:0 16px 14px;color:var(--ink2);font-size:15px}
+footer{margin:56px 0 0;border-top:1px solid var(--line);padding:26px 0 46px;color:var(--dim);font-size:13.5px}
+footer .cols{display:grid;grid-template-columns:1.3fr 1fr;gap:28px}
+@media(max-width:760px){footer .cols{grid-template-columns:1fr}}
+footer a{color:var(--ink2)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#2a170d;border:1px solid var(--acc);color:#fff;font-weight:600;padding:12px 18px;border-radius:12px;box-shadow:var(--sh);z-index:50;max-width:92vw}
+</style></head><body>
+
+<header class="top"><div class="wrap">
+<a class="brand" href="#top"><img src="data:image/png;base64,__LOGO__" alt="">SLOOP 3</a>
+<span class="badge beta" data-t="beta">Public beta</span><span class="badge ver">v__VERSION__</span>
+<nav aria-label="Links">
+<a class="opt" href="https://github.com/isod89/sloop3-fm1/blob/main/docs/GUIDE.md" data-t="navGuide">Guide</a>
+<a class="opt" href="https://isod89.github.io/sloop3-fm1/editor.html" data-t="navEditor">Web editor</a>
+<a class="opt" href="#help" data-t="navHelp">Help</a>
+<a class="opt" href="https://github.com/isod89/sloop3-fm1/issues/new/choose" data-t="navBug">Report a bug</a>
+<div class="lang" role="group" aria-label="Language"><button id="lang-en" aria-pressed="true">EN</button><button id="lang-fr" aria-pressed="false">FR</button></div>
+</nav>
+</div><div class="stripe"></div></header>
+
+<main class="wrap" id="top">
+<section class="hero">
+<div>
+<span class="badge beta" data-t="heroBadge">Public beta · free</span>
+<h1 data-t="heroTitle">Install <span>SLOOP 3</span> on your FM-1</h1>
+<p class="lead" data-t="heroLead">SLOOP 3 turns the M-VAVE FM-1 into a complete groovebox: drums, bass, chords, melodies and effects, with a sequencer that loops it all. This page installs it for you, step by step, right from your browser.</p>
+<ul class="facts">
+<li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span data-t="fact1">About 10 minutes the first time, 1 minute to update</span></li>
+<li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg><span data-t="fact2">A full backup before anything is written</span></li>
+<li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12h16M12 4v16"/></svg><span data-t="fact3">Nothing to install on your computer</span></li>
+</ul>
+<div class="checks" id="checks"></div>
+<div class="blocker hide" id="blocker"></div>
+</div>
+<figure class="shot" style="margin:0"><img src="data:image/webp;base64,__HERO__" alt="The M-VAVE FM-1 running SLOOP 3" data-t-alt="heroAlt"><figcaption class="cap" data-t="heroCap">The FM-1 running SLOOP 3 (3D render)</figcaption></figure>
+</section>
+
+<div class="wizard" id="wizard">
+<ol class="rail" id="rail">
+<li id="st1" class="now"><button data-go="1"><span class="n"><span>1</span></span><span class="t" data-t="r1">Before you start<small>A beta: what it means</small></span></button></li>
+<li aria-hidden="true"><div class="line"></div></li>
+<li id="st2"><button data-go="2" disabled><span class="n"><span>2</span></span><span class="t" data-t="r2">Safety net<small>m-bootloader, once</small></span></button></li>
+<li aria-hidden="true"><div class="line"></div></li>
+<li id="st3"><button data-go="3" disabled><span class="n"><span>3</span></span><span class="t" data-t="r3">Connect<small>MIDI MODE, USB</small></span></button></li>
+<li aria-hidden="true"><div class="line"></div></li>
+<li id="st4"><button data-go="4" disabled><span class="n"><span>4</span></span><span class="t" data-t="r4">Back up<small>Your FM-1, as it is</small></span></button></li>
+<li aria-hidden="true"><div class="line"></div></li>
+<li id="st5"><button data-go="5" disabled><span class="n"><span>5</span></span><span class="t" data-t="r5">Install<small>About a minute</small></span></button></li>
+<li aria-hidden="true"><div class="line"></div></li>
+<li id="st6"><button data-go="6" disabled><span class="n"><span>6</span></span><span class="t" data-t="r6">Play<small>Your first minute</small></span></button></li>
+</ol>
+
+<div>
+<!-- 1 -->
+<section class="pane" id="p1" aria-labelledby="h1">
+<div class="eyebrow" data-t="e1">Step 1 of 5</div>
+<h2 id="h1" data-t="h1">Before you start</h2>
+<p class="sub" data-t="s1">SLOOP 3 is new. Here is what to expect, and what you need.</p>
+<div class="note warn"><b data-t="betaT">SLOOP 3 is a public beta</b><span data-t="betaB">It was rewritten from scratch: a new sound engine, a new sequencer, a new interface. It is being tested on real FM-1s right now, so you may meet bugs. Keep backups, and don't rely on it on stage yet. When something goes wrong, <a href="https://github.com/isod89/sloop3-fm1/issues/new/choose">tell us</a>: every report makes it better.</span></div>
+<div class="note info"><b data-t="stableT">Prefer the tried and tested version?</b><span data-t="stableB">SLOOP 2.8 stays available on its own page: <a href="https://isod89.github.io/sloop-fm1/">isod89.github.io/sloop-fm1</a>. SLOOP 3 never changes SLOOP 2.8's data, so you can go back at any time with your backup.</span></div>
+<h3 data-t="needT">You need</h3>
+<ul>
+<li data-t="need1">An <b>M-VAVE FM-1</b> and a <b>USB data cable</b> (a charge-only cable won't work), plugged straight into the computer.</li>
+<li data-t="need2"><b>Chrome</b> or <b>Edge</b> on Windows, macOS, Linux or ChromeOS (or Chrome on Android).</li>
+<li data-t="need3">The FM-1 powered by USB the whole time.</li>
+</ul>
+<div class="note"><b data-t="upT">Updating from SLOOP 3.0 to 3.3.4?</b><span data-t="upB">Since 3.3.5 the FM-1 keeps one project, with room for the fullest one. At the first start, the newest of your 8 projects is kept. <b>Before you install:</b> open the <a href="https://isod89.github.io/sloop3-fm1/editor.html">web editor</a>, Projects, <b>BACK UP EVERYTHING</b>. The editor puts any of them back later.</span></div>
+<label class="check"><input type="checkbox" id="ok1"><span data-t="ack">I understand that SLOOP 3 is a beta, that I install it at my own risk, and that I'll keep a backup of my FM-1.</span></label>
+<div class="foot"><span class="dim small" data-t="time1">The whole install: about 10 minutes the first time.</span><div class="right"><button class="btn primary" id="n1" disabled data-t="cont">Continue</button></div></div>
+</section>
+
+<!-- 2 -->
+<section class="pane hide" id="p2" aria-labelledby="h2">
+<div class="eyebrow" data-t="e2">Step 2 of 5</div>
+<h2 id="h2" data-t="h2">The safety net: m-bootloader</h2>
+<p class="sub" data-t="s2">SLOOP 3 installs through m-bootloader, a small free program that sits under the firmware. If an install is ever interrupted, your FM-1 opens a recovery menu instead of getting stuck. You set it up once.</p>
+<div class="media">
+<img src="data:image/webp;base64,__PLAY__" alt="The PLAY button of the FM-1" data-t-alt="playAlt">
+<div>
+<h3 style="margin-top:0" data-t="haveT">Is it already there? Check in 10 seconds</h3>
+<ol class="steps">
+<li data-t="have1">Switch the FM-1 <b>off</b>.</li>
+<li data-t="have2">Hold <kbd>PLAY</kbd> and switch it <b>on</b>. Keep holding about a second.</li>
+<li data-t="have3">A menu with <b>BOOT APP</b>, <b>DOWNLOAD MODE</b> and <b>MIDI MODE</b>? Then it's there.</li>
+</ol>
+</div></div>
+<div class="choices" role="group" aria-label="m-bootloader">
+<button class="choice" id="mbYes" aria-pressed="false"><div class="ico">✓</div><b data-t="yesT">I see the menu</b><span data-t="yesB">m-bootloader is installed. Go on to connect.</span></button>
+<button class="choice" id="mbNo" aria-pressed="false"><div class="ico">?</div><b data-t="noT">No menu, or not sure</b><span data-t="noB">Set up m-bootloader first. We'll walk you through it.</span></button>
+</div>
+<div id="mbGuide" class="hide">
+<div class="ways">
+<div class="way rec">
+<span class="tag" data-t="w1tag">Recommended · Windows, macOS, Linux</span>
+<h3 data-t="w1T">With M-Flasher</h3>
+<div class="links"><a href="https://github.com/jvitkauskas/m-flasher/releases/latest" target="_blank" rel="noopener">M-Flasher ↗</a><a href="https://github.com/jvitkauskas/m-bootloader/releases/latest" target="_blank" rel="noopener">m-bootloader (fm1-uboot.boot) ↗</a></div>
+<ol class="steps">
+<li data-t="w1a">Download <b>M-Flasher</b> and <code>fm1-uboot.boot</code> (links above). <span class="dim small">Windows: run <code>M-Flasher.exe</code> as administrator (it isn't signed: <i>More info → Run anyway</i>). macOS: <i>System Settings → Privacy &amp; Security → Open Anyway</i>.</span></li>
+<li data-t="w1b">Connect the FM-1 and click <b>DOWNLOAD MODE</b> in M-Flasher (or, with SLOOP 2.8 running, hold <kbd>OCT-</kbd> and <kbd>OCT+</kbd> for 5 seconds). The screen doesn't change; the computer sees a disk named <code>WL82 UBOOT1.00</code>. <b>If Windows offers to format it, click Cancel.</b></li>
+<li data-t="w1c"><b>Back up</b> the whole FM-1 with M-Flasher and keep the file: it brings your FM-1 back exactly as it is today.</li>
+<li data-t="w1d">Install the bootloader with <code>fm1-uboot.boot</code>. Only the boot area is written: your current firmware stays.</li>
+<li data-t="w1e">Switch the FM-1 off and on while holding <kbd>PLAY</kbd>: the menu appears.</li>
+</ol>
+</div>
+<div class="way">
+<span class="tag" data-t="w2tag">Alternative · FM-1 on M-VAVE's own firmware</span>
+<h3 data-t="w2T">With M-VAVE's M-UPGRADE app</h3>
+<p data-t="w2a">Download <code>fm1-uboot.fwsc</code> from the <a href="https://github.com/jvitkauskas/m-bootloader/releases/latest" target="_blank" rel="noopener">latest m-bootloader release</a>, open it in M-UPGRADE (close other MIDI apps first) and start the upgrade. It writes only the bootloader. If in doubt, prefer M-Flasher, which also makes the full backup.</p>
+</div>
+</div>
+<div class="note warn"><b data-t="mbWarnT">Good to know</b><ul data-t="mbWarnB"><li>Keep the power on while the bootloader is written.</li><li>Newer FM-1s may have another flash chip, the <b>UCUN UC25HQ80</b> (JEDEC <code>0xB36014</code>), on which m-bootloader is little tested. If M-Flasher reports it, read the <a href="https://github.com/jvitkauskas/m-bootloader#status">status notes</a> first.</li><li>M-VAVE's official updates put their own bootloader back: after one, do this step again.</li></ul></div>
+<button class="btn" id="mbDone" data-t="mbDone">Done: I see the menu now</button>
+</div>
+<div class="foot"><button class="btn ghost" data-back="1" data-t="back">← Back</button><div class="right"><button class="btn primary" id="n2" disabled data-t="cont">Continue</button></div></div>
+</section>
+
+<!-- 3 -->
+<section class="pane hide" id="p3" aria-labelledby="h3">
+<div class="eyebrow" data-t="e3">Step 3 of 5</div>
+<h2 id="h3" data-t="h3">Connect your FM-1</h2>
+<p class="sub" data-t="s3">Start the FM-1 in MIDI MODE, plug it in, and let this page find it.</p>
+<ol class="steps">
+<li data-t="c1">Switch the FM-1 off, then on while holding <kbd>PLAY</kbd>.</li>
+<li data-t="c2">In the menu, choose <b>MIDI MODE</b> with <kbd>OCT-</kbd> / <kbd>OCT+</kbd>, then press <kbd>PLAY</kbd>. The screen asks you to connect USB.</li>
+<li data-t="c3">Plug it into the computer with the USB cable, then click <b>Connect</b>. When the browser asks to control your MIDI devices, click <b>Allow</b>.</li>
+</ol>
+<div class="buttons"><button class="btn primary big" id="con" data-t="connect">Connect</button></div>
+<div class="wait hide" id="waiting"><div class="spin"></div><div><b data-t="waitT">Looking for your FM-1…</b><div class="small dim" data-t="waitB">Keep it in MIDI MODE and plugged in. It's found automatically as soon as it appears.</div></div></div>
+<div class="device hide" id="device"><div class="dot"></div><div><b data-t="devT">FM-1 connected</b><div class="meta" id="devMeta"></div></div></div>
+<div class="status" id="status" role="status" aria-live="polite"></div>
+<div class="note bad hide" id="err3"></div>
+<div class="foot"><button class="btn ghost" data-back="2" data-t="back">← Back</button><div class="right"><button class="btn primary" id="n3" disabled data-t="cont">Continue</button></div></div>
+</section>
+
+<!-- 4 -->
+<section class="pane hide" id="p4" aria-labelledby="h4">
+<div class="eyebrow" data-t="e4">Step 4 of 5</div>
+<h2 id="h4" data-t="h4">Back up your FM-1</h2>
+<p class="sub" data-t="s4">A copy of the whole FM-1 (1 MB), saved to your downloads. Nothing is written. With this file, your FM-1 can always come back exactly as it is now.</p>
+<div class="buttons"><button class="btn primary big" id="bak" data-t="backup">Back up my FM-1</button></div>
+<div class="prog hide" id="bprog"><div class="row"><b id="bpct">0 %</b><span id="beta"></span></div><div class="bar"><div id="bfill"></div></div></div>
+<div class="device hide" id="bdone"><div class="dot"></div><div><b data-t="bdoneT">Backup saved</b><div class="meta" id="bname"></div></div></div>
+<div class="note bad hide" id="err4"></div>
+<label class="check"><input type="checkbox" id="haveBak"><span data-t="haveBak">I already have a full backup of this FM-1, made with M-Flasher.</span></label>
+<div class="foot"><button class="btn ghost" data-back="3" data-t="back">← Back</button><div class="right"><button class="btn primary" id="n4" disabled data-t="cont">Continue</button></div></div>
+</section>
+
+<!-- 5 -->
+<section class="pane hide" id="p5" aria-labelledby="h5">
+<div class="eyebrow" data-t="e5">Step 5 of 5</div>
+<h2 id="h5" data-t="h5">Install SLOOP 3</h2>
+<p class="sub" data-t="s5">About a minute. The FM-1 first checks the whole package, without erasing anything, then writes it.</p>
+<dl class="summary"><dt data-t="sumFw">Firmware</dt><dd>SLOOP 3 v__VERSION__ <span class="badge beta" data-t="beta">Public beta</span></dd><dt data-t="sumDev">Device</dt><dd id="sumDev">—</dd><dt data-t="sumBak">Backup</dt><dd id="sumBak">—</dd></dl>
+<div class="note warn"><b data-t="keepT">During the install</b><span data-t="keepB">Don't unplug the FM-1, and keep this tab in front: browsers slow down tabs in the background.</span></div>
+<div class="buttons"><button class="btn primary big" id="go" disabled data-t="install">Install SLOOP 3</button></div>
+<div class="prog hide" id="iprog"><div class="row"><b id="ipct">0 %</b><span id="ieta"></span></div><div class="bar"><div id="fill"></div></div>
+<div class="phases"><span class="phase" id="ph1" data-t="ph1">1 · Checking (nothing erased)</span><span class="phase" id="ph2" data-t="ph2">2 · Writing</span><span class="phase" id="ph3" data-t="ph3">3 · Restarting</span></div></div>
+<div class="note bad hide" id="err5"></div>
+<div class="foot"><button class="btn ghost" data-back="4" id="b5" data-t="back">← Back</button></div>
+</section>
+
+<!-- 6 -->
+<section class="pane hide" id="p6" aria-labelledby="h6">
+<div class="big-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+<h2 id="h6" data-t="h6">SLOOP 3 is installed</h2>
+<p class="sub" data-t="s6">The FM-1 restarts on SLOOP 3 and the sailboat logo draws itself in. Turn <b>MASTER</b> up gently, and have fun.</p>
+<div class="cards">
+<div class="card"><b data-t="f1T">Sounds</b><p data-t="f1B"><kbd>ALGORITHM</kbd> picks the track (synths 1–4, drums 5). <kbd>PRESETS</kbd> opens SOUNDS, every sound by category.</p></div>
+<div class="card"><b data-t="f2T">Record</b><p data-t="f2B"><kbd>PLAY</kbd>, then <kbd>REC</kbd>, and play the keys. Hold <kbd>EDIT</kbd> + <kbd>OCT-</kbd> to undo.</p></div>
+<div class="card"><b data-t="f3T">Play live</b><p data-t="f3B">Hold <kbd>FX</kbd> and play a key: an effect. Hold <kbd>HOME</kbd>: open, new, save light up.</p></div>
+</div>
+<div class="buttons" style="display:flex;flex-wrap:wrap;gap:10px">
+<a class="btn primary" href="https://isod89.github.io/sloop3-fm1/editor.html" data-t="openEd">Open the web editor</a>
+<a class="btn" href="https://github.com/isod89/sloop3-fm1/blob/main/docs/GUIDE.md" data-t="readGuide">Read the guide</a>
+<a class="btn" href="https://github.com/isod89/sloop3-fm1/issues/new/choose" data-t="report">Report a bug</a>
+</div>
+<div class="note info"><b data-t="from28T">Coming from SLOOP 2.8?</b><span data-t="from28B">At its first start, SLOOP 3 opens what SLOOP 2.8 left: your sections become patterns, and your presets, favourites, samples, SYN kits, FM6 bank and settings come along. SLOOP 2.8's data is only read, never written.</span></div>
+</section>
+
+<details class="more" style="margin-top:18px"><summary data-t="details">Technical details</summary><div><div id="log"></div></div></details>
+</div>
+</div>
+
+<section class="help" id="help">
+<h2 data-t="helpT">Help</h2>
+<p class="dim" data-t="helpS">The answers to what can go wrong. Still stuck? <a href="https://github.com/isod89/sloop3-fm1/issues/new/choose">Ask in the issues</a>.</p>
+<div class="faq">
+<details><summary data-t="q1">“No FM-1 found”</summary><div data-t="a1">Check that the FM-1 shows MIDI MODE (step 3), and that the cable carries data: try another cable or USB port, without a hub. Close other apps that use MIDI (M-UPGRADE, editors, music software), then click Connect again.</div></details>
+<details><summary data-t="q2">“The FM-1 is running a firmware”</summary><div data-t="a2">It started SLOOP, or another firmware, instead of the menu. Switch it off, then on while holding <kbd>PLAY</kbd> about a second. If no menu appears, m-bootloader isn't installed yet (step 2).</div></details>
+<details><summary data-t="q3">The install stopped halfway</summary><div data-t="a3">Nothing is lost. Nothing is erased before the whole package has been checked. If it stops while writing, m-bootloader sees an incomplete firmware at the next start and opens its menu by itself: reload this page and install again.</div></details>
+<details><summary data-t="q4">The browser never asks about MIDI</summary><div data-t="a4">Use Chrome or Edge. Click the icon left of the address, open the site settings, and allow MIDI devices. Then reload the page.</div></details>
+<details><summary data-t="q5">The backup stops</summary><div data-t="a5">Some m-bootloader versions don't answer reads. Make the backup with M-Flasher instead (step 2), then tick “I already have a full backup”.</div></details>
+<details><summary data-t="q6">SLOOP 3 doesn't start, or starts badly</summary><div data-t="a6">Hold <kbd>OCT-</kbd> while switching on: <b>RESCUE</b>. <kbd>PLAY</kbd> starts with an empty project (your saved project is kept). Or hold <kbd>PLAY</kbd> for m-bootloader's menu and install again. Then tell us what the screen showed.</div></details>
+<details><summary data-t="q7">Going back to SLOOP 2.8 or M-VAVE's firmware</summary><div data-t="a7">Restore your backup with M-Flasher (hold <kbd>REC</kbd> while switching on for download mode). It brings the FM-1 back exactly as it was when you made it. Projects made with SLOOP 3 since then are not in it: save them as files with the web editor first.</div></details>
+<details><summary data-t="q8">Updating SLOOP 3 later</summary><div data-t="a8">Open this page again: steps 3 to 5, about a minute. Your project and your sounds stay.</div></details>
+</div>
+</section>
+
+<footer><div class="cols">
+<div><p data-t="foot1"><b>SLOOP 3</b> is free software (GPL-3.0) by the SLOOP project: <a href="https://github.com/isod89/sloop3-fm1">github.com/isod89/sloop3-fm1</a>. Public beta. Unofficial: not made, endorsed or supported by M-VAVE. Installing third-party firmware is at your own risk.</p>
+<p data-t="foot2">The stable version, SLOOP 2.8: <a href="https://github.com/isod89/sloop-fm1">github.com/isod89/sloop-fm1</a>.</p></div>
+<div><p data-t="foot3">m-bootloader and M-Flasher are by Julius Vitkauskas (MIT licence): <a href="https://github.com/jvitkauskas/m-bootloader">m-bootloader</a> · <a href="https://github.com/jvitkauskas/m-flasher">M-Flasher</a>. This page contains none of their code: it talks to m-bootloader's MIDI MODE as its specification describes.</p>
+<p data-t="foot4">Private by design: this page sends nothing anywhere but to your FM-1.</p></div>
+</div></footer>
+</main>
+<div class="toast hide" id="toast" role="alert"></div>
+<script>
+__FWPKG__
+const AREA = Uint8Array.from(atob("__AREA__"), c => c.charCodeAt(0));
+const VERSION = "__VERSION__";
+const W = typeof window !== 'undefined' ? window : {};
+/* ---------------------------------------------------------------- the words (English, French) */
+const L = {
+en: {
+  e1: 'Step 1 of 5', e2: 'Step 2 of 5', e3: 'Step 3 of 5', e4: 'Step 4 of 5', e5: 'Step 5 of 5',
+  ready: 'Put the FM-1 in MIDI MODE, plug it in, then click Connect.',
+  noport: 'No FM-1 in MIDI MODE was found. MIDI devices seen: {n}.',
+  noportFix: 'Check that the FM-1 shows MIDI MODE and that the cable carries data. Try another cable or USB port, without a hub, and close other music apps. This page keeps looking.',
+  running: 'The FM-1 is running a firmware, not m-bootloader\'s MIDI MODE.',
+  runningFix: 'Switch it off, then on while holding PLAY, choose MIDI MODE, press PLAY. It is found automatically. No menu? Set up m-bootloader (step 2).',
+  found: 'FM-1 found: ', reading: '. Reading the chip key...', notmb: 'This is not m-bootloader answering. Nothing is sent.',
+  mb: 'm-bootloader ', stage: ' (RAM stage)', key: ', chip key 0x', badpkg: 'The package does not check out ({e}). Nothing is sent.',
+  fwready: 'Connected. SLOOP 3 is ready for this FM-1 ({n} bytes, encrypted for its chip).',
+  devMeta: 'm-bootloader {v} · chip key {k} · flash {f}',
+  noans: 'The FM-1 does not answer.', noansFix: 'Switch it off, then on while holding PLAY, choose MIDI MODE, and click Connect again.',
+  inst: 'Installing... Do not unplug the FM-1 and keep this tab in front.', check: 'Checking the package', write: 'Writing SLOOP 3',
+  done: 'Installed! The FM-1 restarts on SLOOP 3.',
+  refused: 'The FM-1 refused the package (code {c}).', intact: ' Nothing was written: the FM-1 is as it was.', refusedFix: 'Switch it off and on in MIDI MODE, reload this page and try again. If it happens again, tell us the code.',
+  bstart: 'Backing up the whole flash (1 MB)... Nothing is written.', bdone: 'Backup saved to your downloads: ',
+  bfail: 'The backup stopped (no answer at 0x{a}).', bfailFix: 'This m-bootloader may not answer reads. Make the backup with M-Flasher, then tick the box below.',
+  nomidi: 'This browser can\'t talk to MIDI devices.', err: 'Error: ', denied: 'MIDI access was not allowed.', deniedFix: 'Click the icon left of the address, allow MIDI devices for this site, and click Connect again.',
+  left: '{s} left', kb: '{a} of {b} KB', bakNone: 'Not made here (you have one from M-Flasher)', bakFile: 'Saved: {n}',
+  leave: 'SLOOP 3 is being installed. Leaving now interrupts it.', hidden: 'Keep this tab in front while installing: browsers slow down background tabs.',
+  chkBrowser: 'Chrome or Edge', chkMidi: 'Web MIDI', chkSecure: 'Secure page', chkNo: 'not available',
+  block: '<b>This browser can\'t install SLOOP 3.</b> Open this page in <b>Chrome</b> or <b>Edge</b> on a computer (or Chrome on Android): <code>https://isod89.github.io/sloop3-fm1/</code>',
+  beta: 'Public beta', navGuide: 'Guide', navEditor: 'Web editor', navHelp: 'Help', navBug: 'Report a bug'
+},
+fr: {
+  e1: 'Étape 1 sur 5', e2: 'Étape 2 sur 5', e3: 'Étape 3 sur 5', e4: 'Étape 4 sur 5', e5: 'Étape 5 sur 5',
+  ready: 'Mets le FM-1 en MIDI MODE, branche-le, puis clique sur Connecter.',
+  noport: 'Aucun FM-1 en MIDI MODE trouvé. Appareils MIDI vus : {n}.',
+  noportFix: 'Vérifie que le FM-1 affiche MIDI MODE et que le câble transporte des données. Essaie un autre câble ou un autre port USB, sans hub, et ferme les autres logiciels de musique. La page continue de chercher.',
+  running: 'Le FM-1 fait tourner un firmware, pas le MIDI MODE de m-bootloader.',
+  runningFix: 'Éteins-le, puis rallume-le en tenant PLAY, choisis MIDI MODE, appuie sur PLAY. Il sera trouvé tout seul. Pas de menu ? Installe m-bootloader (étape 2).',
+  found: 'FM-1 trouvé : ', reading: '. Lecture de la clé de la puce...', notmb: 'Ce n\'est pas m-bootloader qui répond. Rien n\'est envoyé.',
+  mb: 'm-bootloader ', stage: ' (en RAM)', key: ', clé de la puce 0x', badpkg: 'Le paquet n\'est pas valide ({e}). Rien n\'est envoyé.',
+  fwready: 'Connecté. SLOOP 3 est prêt pour ce FM-1 ({n} octets, chiffrés pour sa puce).',
+  devMeta: 'm-bootloader {v} · clé de la puce {k} · flash {f}',
+  noans: 'Le FM-1 ne répond pas.', noansFix: 'Éteins-le, puis rallume-le en tenant PLAY, choisis MIDI MODE, et clique de nouveau sur Connecter.',
+  inst: 'Installation... Ne débranche pas le FM-1 et garde cet onglet au premier plan.', check: 'Vérification du paquet', write: 'Écriture de SLOOP 3',
+  done: 'Installé ! Le FM-1 redémarre sur SLOOP 3.',
+  refused: 'Le FM-1 a refusé le paquet (code {c}).', intact: ' Rien n\'a été écrit : le FM-1 est comme avant.', refusedFix: 'Éteins-le et rallume-le en MIDI MODE, recharge cette page et réessaie. Si ça recommence, donne-nous le code.',
+  bstart: 'Sauvegarde de toute la flash (1 Mo)... Rien n\'est écrit.', bdone: 'Sauvegarde enregistrée dans tes téléchargements : ',
+  bfail: 'La sauvegarde s\'est arrêtée (pas de réponse à 0x{a}).', bfailFix: 'Ce m-bootloader ne répond peut-être pas aux lectures. Fais la sauvegarde avec M-Flasher, puis coche la case ci-dessous.',
+  nomidi: 'Ce navigateur ne sait pas parler aux appareils MIDI.', err: 'Erreur : ', denied: 'L\'accès MIDI n\'a pas été autorisé.', deniedFix: 'Clique sur l\'icône à gauche de l\'adresse, autorise les appareils MIDI pour ce site, et clique de nouveau sur Connecter.',
+  left: 'encore {s}', kb: '{a} sur {b} Ko', bakNone: 'Pas faite ici (tu en as une de M-Flasher)', bakFile: 'Enregistrée : {n}',
+  leave: 'SLOOP 3 est en cours d\'installation. Quitter maintenant l\'interrompt.', hidden: 'Garde cet onglet au premier plan pendant l\'installation : les navigateurs ralentissent les onglets en arrière-plan.',
+  chkBrowser: 'Chrome ou Edge', chkMidi: 'Web MIDI', chkSecure: 'Page sécurisée', chkNo: 'indisponible',
+  block: '<b>Ce navigateur ne peut pas installer SLOOP 3.</b> Ouvre cette page dans <b>Chrome</b> ou <b>Edge</b> sur un ordinateur (ou Chrome sur Android) : <code>https://isod89.github.io/sloop3-fm1/</code>',
+  beta: 'Bêta publique', navGuide: 'Guide', navEditor: 'Éditeur web', navHelp: 'Aide', navBug: 'Signaler un bug',
+  heroBadge: 'Bêta publique · gratuit', heroTitle: 'Installe <span>SLOOP 3</span> sur ton FM-1',
+  heroLead: 'SLOOP 3 fait du M-VAVE FM-1 une groovebox complète : batterie, basse, accords, mélodies et effets, avec un séquenceur qui boucle le tout. Cette page l\'installe pour toi, étape par étape, depuis ton navigateur.',
+  fact1: 'Environ 10 minutes la première fois, 1 minute pour une mise à jour', fact2: 'Une sauvegarde complète avant toute écriture', fact3: 'Rien à installer sur ton ordinateur',
+  heroCap: 'Le FM-1 avec SLOOP 3 (rendu 3D)',
+  r1: 'Avant de commencer<small>Une bêta : ce que ça veut dire</small>', r2: 'Le filet de sécurité<small>m-bootloader, une fois</small>', r3: 'Connecter<small>MIDI MODE, USB</small>',
+  r4: 'Sauvegarder<small>Ton FM-1, tel qu\'il est</small>', r5: 'Installer<small>Environ une minute</small>', r6: 'Jouer<small>Ta première minute</small>',
+  h1: 'Avant de commencer', s1: 'SLOOP 3 est tout neuf. Voici à quoi t\'attendre, et ce qu\'il te faut.',
+  betaT: 'SLOOP 3 est une bêta publique', betaB: 'Il a été réécrit de zéro : un nouveau moteur de son, un nouveau séquenceur, une nouvelle interface. Il est testé sur de vrais FM-1 en ce moment, tu peux donc rencontrer des bugs. Garde des sauvegardes, et ne compte pas encore dessus sur scène. Quand quelque chose ne va pas, <a href="https://github.com/isod89/sloop3-fm1/issues/new/choose">dis-le-nous</a> : chaque retour l\'améliore.',
+  stableT: 'Tu préfères la version éprouvée ?', stableB: 'SLOOP 2.8 reste disponible sur sa propre page : <a href="https://isod89.github.io/sloop-fm1/">isod89.github.io/sloop-fm1</a>. SLOOP 3 ne modifie jamais les données de SLOOP 2.8 : tu peux revenir en arrière à tout moment avec ta sauvegarde.',
+  needT: 'Il te faut', need1: 'Un <b>M-VAVE FM-1</b> et un <b>câble USB de données</b> (un câble de charge seule ne marche pas), branché directement sur l\'ordinateur.',
+  need2: '<b>Chrome</b> ou <b>Edge</b> sur Windows, macOS, Linux ou ChromeOS (ou Chrome sur Android).', need3: 'Le FM-1 alimenté par l\'USB tout du long.',
+  upT: 'Tu mets à jour depuis SLOOP 3.0 à 3.3.4 ?', upB: 'Depuis la 3.3.5, le FM-1 garde un projet, avec de la place pour le plus plein. Au premier démarrage, le plus récent de tes 8 projets est gardé. <b>Avant d\'installer :</b> ouvre l\'<a href="https://isod89.github.io/sloop3-fm1/editor.html">éditeur web</a>, Projets, <b>TOUT SAUVEGARDER</b>. L\'éditeur remet ensuite n\'importe lequel.',
+  ack: 'Je comprends que SLOOP 3 est une bêta, que je l\'installe à mes risques, et que je garderai une sauvegarde de mon FM-1.',
+  time1: 'L\'installation complète : environ 10 minutes la première fois.', cont: 'Continuer', back: '← Retour',
+  h2: 'Le filet de sécurité : m-bootloader', s2: 'SLOOP 3 s\'installe par m-bootloader, un petit programme libre qui se place sous le firmware. Si une installation est interrompue, ton FM-1 ouvre un menu de secours au lieu de rester bloqué. Tu le mets en place une seule fois.',
+  haveT: 'Il est déjà là ? Vérifie en 10 secondes', have1: 'Éteins le FM-1.', have2: 'Tiens <kbd>PLAY</kbd> et rallume-le. Garde le doigt environ une seconde.', have3: 'Un menu avec <b>BOOT APP</b>, <b>DOWNLOAD MODE</b> et <b>MIDI MODE</b> ? Alors il est là.',
+  yesT: 'Je vois le menu', yesB: 'm-bootloader est installé. Passe à la connexion.', noT: 'Pas de menu, ou je ne sais pas', noB: 'Installe d\'abord m-bootloader. On te guide.',
+  w1tag: 'Recommandé · Windows, macOS, Linux', w1T: 'Avec M-Flasher',
+  w1a: 'Télécharge <b>M-Flasher</b> et <code>fm1-uboot.boot</code> (liens ci-dessus). <span class="dim small">Windows : lance <code>M-Flasher.exe</code> en administrateur (il n\'est pas signé : <i>Informations complémentaires → Exécuter quand même</i>). macOS : <i>Réglages Système → Confidentialité et sécurité → Ouvrir quand même</i>.</span>',
+  w1b: 'Branche le FM-1 et clique sur <b>DOWNLOAD MODE</b> dans M-Flasher (ou, avec SLOOP 2.8, tiens <kbd>OCT-</kbd> et <kbd>OCT+</kbd> 5 secondes). L\'écran ne change pas ; l\'ordinateur voit un disque nommé <code>WL82 UBOOT1.00</code>. <b>Si Windows propose de le formater, clique sur Annuler.</b>',
+  w1c: '<b>Sauvegarde</b> tout le FM-1 avec M-Flasher et garde le fichier : il remet ton FM-1 exactement comme aujourd\'hui.',
+  w1d: 'Installe le bootloader avec <code>fm1-uboot.boot</code>. Seule la zone de démarrage est écrite : ton firmware actuel reste.',
+  w1e: 'Éteins et rallume le FM-1 en tenant <kbd>PLAY</kbd> : le menu apparaît.',
+  w2tag: 'Autre possibilité · FM-1 avec le firmware de M-VAVE', w2T: 'Avec l\'application M-UPGRADE de M-VAVE',
+  w2a: 'Télécharge <code>fm1-uboot.fwsc</code> depuis la <a href="https://github.com/jvitkauskas/m-bootloader/releases/latest" target="_blank" rel="noopener">dernière version de m-bootloader</a>, ouvre-le dans M-UPGRADE (ferme d\'abord les autres applis MIDI) et lance la mise à jour. Seul le bootloader est écrit. Dans le doute, préfère M-Flasher, qui fait aussi la sauvegarde complète.',
+  mbWarnT: 'Bon à savoir', mbWarnB: '<li>Garde l\'alimentation pendant l\'écriture du bootloader.</li><li>Les FM-1 récents peuvent avoir une autre puce flash, la <b>UCUN UC25HQ80</b> (JEDEC <code>0xB36014</code>), sur laquelle m-bootloader est peu testé. Si M-Flasher l\'indique, lis d\'abord les <a href="https://github.com/jvitkauskas/m-bootloader#status">notes d\'état</a>.</li><li>Les mises à jour officielles de M-VAVE remettent leur propre bootloader : après l\'une d\'elles, refais cette étape.</li>',
+  mbDone: 'C\'est fait : je vois le menu',
+  h3: 'Connecte ton FM-1', s3: 'Démarre le FM-1 en MIDI MODE, branche-le, et laisse la page le trouver.',
+  c1: 'Éteins le FM-1, puis rallume-le en tenant <kbd>PLAY</kbd>.', c2: 'Dans le menu, choisis <b>MIDI MODE</b> avec <kbd>OCT-</kbd> / <kbd>OCT+</kbd>, puis appuie sur <kbd>PLAY</kbd>. L\'écran demande de brancher l\'USB.',
+  c3: 'Branche-le à l\'ordinateur avec le câble USB, puis clique sur <b>Connecter</b>. Quand le navigateur demande de contrôler tes appareils MIDI, clique sur <b>Autoriser</b>.',
+  connect: 'Connecter', waitT: 'Recherche de ton FM-1…', waitB: 'Garde-le en MIDI MODE et branché. Il est trouvé tout seul dès qu\'il apparaît.', devT: 'FM-1 connecté',
+  h4: 'Sauvegarde ton FM-1', s4: 'Une copie de tout le FM-1 (1 Mo), enregistrée dans tes téléchargements. Rien n\'est écrit. Avec ce fichier, ton FM-1 peut toujours revenir exactement comme maintenant.',
+  backup: 'Sauvegarder mon FM-1', bdoneT: 'Sauvegarde enregistrée', haveBak: 'J\'ai déjà une sauvegarde complète de ce FM-1, faite avec M-Flasher.',
+  h5: 'Installe SLOOP 3', s5: 'Environ une minute. Le FM-1 vérifie d\'abord tout le paquet, sans rien effacer, puis l\'écrit.',
+  sumFw: 'Firmware', sumDev: 'Appareil', sumBak: 'Sauvegarde', keepT: 'Pendant l\'installation', keepB: 'Ne débranche pas le FM-1, et garde cet onglet au premier plan : les navigateurs ralentissent les onglets en arrière-plan.',
+  install: 'Installer SLOOP 3', ph1: '1 · Vérification (rien d\'effacé)', ph2: '2 · Écriture', ph3: '3 · Redémarrage',
+  h6: 'SLOOP 3 est installé', s6: 'Le FM-1 redémarre sur SLOOP 3 et le voilier se dessine. Monte <b>MASTER</b> doucement, et amuse-toi bien.',
+  f1T: 'Les sons', f1B: '<kbd>ALGORITHM</kbd> choisit la piste (synthés 1 à 4, batterie 5). <kbd>PRESETS</kbd> ouvre SOUNDS, tous les sons par catégorie.',
+  f2T: 'Enregistrer', f2B: '<kbd>PLAY</kbd>, puis <kbd>REC</kbd>, et joue sur les touches. <kbd>EDIT</kbd> tenu + <kbd>OCT-</kbd> pour annuler.',
+  f3T: 'Jouer en live', f3B: 'Tiens <kbd>FX</kbd> et joue une touche : un effet. Tiens <kbd>HOME</kbd> : ouvrir, nouveau et sauver s\'allument.',
+  openEd: 'Ouvrir l\'éditeur web', readGuide: 'Lire le guide', report: 'Signaler un bug',
+  from28T: 'Tu viens de SLOOP 2.8 ?', from28B: 'Au premier démarrage, SLOOP 3 ouvre ce que SLOOP 2.8 a laissé : tes sections deviennent des patterns, et tes presets, favoris, samples, kits SYN, banque FM6 et réglages suivent. Les données de SLOOP 2.8 sont seulement lues, jamais écrites.',
+  details: 'Détails techniques', helpT: 'Aide', helpS: 'Les réponses à ce qui peut mal se passer. Toujours bloqué ? <a href="https://github.com/isod89/sloop3-fm1/issues/new/choose">Demande dans les issues</a>.',
+  q1: '« Aucun FM-1 trouvé »', a1: 'Vérifie que le FM-1 affiche MIDI MODE (étape 3) et que le câble transporte des données : essaie un autre câble ou port USB, sans hub. Ferme les autres applis MIDI (M-UPGRADE, éditeurs, logiciels de musique), puis clique de nouveau sur Connecter.',
+  q2: '« Le FM-1 fait tourner un firmware »', a2: 'Il a démarré SLOOP, ou un autre firmware, au lieu du menu. Éteins-le, puis rallume-le en tenant <kbd>PLAY</kbd> environ une seconde. Si aucun menu n\'apparaît, m-bootloader n\'est pas encore installé (étape 2).',
+  q3: 'L\'installation s\'est arrêtée en route', a3: 'Rien n\'est perdu. Rien n\'est effacé avant que tout le paquet soit vérifié. Si ça s\'arrête pendant l\'écriture, m-bootloader voit un firmware incomplet au démarrage suivant et ouvre son menu tout seul : recharge cette page et réinstalle.',
+  q4: 'Le navigateur ne demande jamais l\'accès MIDI', a4: 'Utilise Chrome ou Edge. Clique sur l\'icône à gauche de l\'adresse, ouvre les paramètres du site et autorise les appareils MIDI. Puis recharge la page.',
+  q5: 'La sauvegarde s\'arrête', a5: 'Certaines versions de m-bootloader ne répondent pas aux lectures. Fais la sauvegarde avec M-Flasher (étape 2), puis coche « J\'ai déjà une sauvegarde complète ».',
+  q6: 'SLOOP 3 ne démarre pas, ou mal', a6: 'Tiens <kbd>OCT-</kbd> en allumant : <b>RESCUE</b>. <kbd>PLAY</kbd> démarre avec un projet vide (ton projet sauvé est gardé). Ou tiens <kbd>PLAY</kbd> pour le menu de m-bootloader et réinstalle. Puis dis-nous ce que l\'écran affichait.',
+  q7: 'Revenir à SLOOP 2.8 ou au firmware de M-VAVE', a7: 'Remets ta sauvegarde avec M-Flasher (tiens <kbd>REC</kbd> en allumant pour le mode téléchargement). Le FM-1 revient exactement comme au moment de la sauvegarde. Les projets faits avec SLOOP 3 depuis n\'y sont pas : enregistre-les d\'abord en fichiers avec l\'éditeur web.',
+  q8: 'Mettre SLOOP 3 à jour plus tard', a8: 'Rouvre cette page : étapes 3 à 5, environ une minute. Ton projet et tes sons restent.',
+  foot1: '<b>SLOOP 3</b> est un logiciel libre (GPL-3.0) du projet SLOOP : <a href="https://github.com/isod89/sloop3-fm1">github.com/isod89/sloop3-fm1</a>. Bêta publique. Non officiel : ni fait, ni approuvé, ni pris en charge par M-VAVE. Installer un firmware tiers se fait à tes risques.',
+  foot2: 'La version stable, SLOOP 2.8 : <a href="https://github.com/isod89/sloop-fm1">github.com/isod89/sloop-fm1</a>.',
+  foot3: 'm-bootloader et M-Flasher sont de Julius Vitkauskas (licence MIT) : <a href="https://github.com/jvitkauskas/m-bootloader">m-bootloader</a> · <a href="https://github.com/jvitkauskas/m-flasher">M-Flasher</a>. Cette page ne contient aucun de leurs codes : elle parle au MIDI MODE de m-bootloader comme sa spécification le décrit.',
+  foot4: 'Respect de ta vie privée : cette page n\'envoie rien nulle part, sauf à ton FM-1.',
+  heroAlt: 'Le M-VAVE FM-1 avec SLOOP 3', playAlt: 'Le bouton PLAY du FM-1'
+}};
+const $ = id => document.getElementById(id);
+let lang = 'en';
+const T = new Proxy({}, { get: (_, k) => (L[lang] && L[lang][k] !== undefined ? L[lang][k] : L.en[k]) });
+const fmt = (s, o) => s.replace(/\{(\w+)\}/g, (_, k) => o[k]);
+/* the page's own English, kept to switch back */
+const EN = {};
+function setLang(l) {
+  lang = l === 'fr' ? 'fr' : 'en';
+  if (document.documentElement) document.documentElement.lang = lang;
+  for (const e of (document.querySelectorAll ? document.querySelectorAll('[data-t]') : [])) {
+    const k = e.dataset.t; if (!(k in EN)) EN[k] = e.innerHTML;
+    e.innerHTML = lang === 'fr' && L.fr[k] !== undefined ? L.fr[k] : EN[k];
+  }
+  for (const e of (document.querySelectorAll ? document.querySelectorAll('[data-t-alt]') : [])) { const k = e.dataset.tAlt; if (!('alt:' + k in EN)) EN['alt:' + k] = e.alt; e.alt = lang === 'fr' && L.fr[k] ? L.fr[k] : EN['alt:' + k]; }
+  for (const b of ['en', 'fr']) { const x = $('lang-' + b); if (x && x.setAttribute) x.setAttribute('aria-pressed', String(b === lang)); }
+  try { localStorage.setItem('sloop3-lang', lang); } catch (e) {}
+  syscheck(); refresh();
+}
+/* ---------------------------------------------------------------- the log, the status */
+const log = (t, c) => { const d = document.createElement('div'); d.textContent = t; if (c) d.className = c; $('log').appendChild(d); if (d.scrollIntoView) d.scrollIntoView({ block: 'nearest' }); };
+const say = (t, c) => { const s = $('status'); s.textContent = t; s.className = 'status ' + (c || ''); log(t, c); };
+const show = (id, on) => { const e = $(id); if (e && e.classList) e.classList.toggle('hide', !on); else if (e) e.hidden = !on; };
+function problem(where, what, fix) { const e = $(where); if (!e) return; e.innerHTML = '<b></b><span></span>'; if (e.firstChild) { e.firstChild.textContent = what; e.lastChild.textContent = fix || ''; } show(where, true); log(what + (fix ? ' ' + fix : ''), 'bad'); }
+let toastT;
+function toast(t) { const e = $('toast'); if (!e) return; e.textContent = t; show('toast', true); clearTimeout(toastT); toastT = setTimeout(() => show('toast', false), 6000); }
+/* ---------------------------------------------------------------- the wizard */
+let step = 1, reached = 1;
+const stepState = (n, s) => { $('st' + n).className = s; };
+function go(n) {
+  n = Math.max(1, Math.min(6, n)); if (n > reached) reached = n;
+  step = n;
+  for (let i = 1; i <= 6; i++) {
+    show('p' + i, i === n);
+    stepState(i, i === n ? 'now' : i < n || (i === 6 && done6) ? 'done' : '');
+    const b = document.querySelector ? document.querySelector('[data-go="' + i + '"]') : null;
+    if (b) b.disabled = i > reached || busy();
+  }
+  const w = $('wizard'); if (w && w.scrollIntoView && W.scrollY > w.offsetTop) w.scrollIntoView({ behavior: 'smooth' });
+}
+let done6 = false;
+const busy = () => state === 'install' || state === 'backup';
+function refresh() {
+  if ($('n1')) $('n1').disabled = !$('ok1').checked;
+  if ($('n2')) $('n2').disabled = !mbOk;
+  if ($('n3')) $('n3').disabled = state !== 'ready';
+  if ($('n4')) $('n4').disabled = !(bakOk || $('haveBak').checked) || busy();
+  if ($('go')) $('go').disabled = state !== 'ready' || !(bakOk || $('haveBak').checked);
+  if ($('sumDev') && key >= 0) $('sumDev').textContent = 'FM-1 · ' + fmt(T.devMeta, devInfo);
+  if ($('sumBak')) $('sumBak').textContent = bakOk ? fmt(T.bakFile, { n: bakName }) : ($('haveBak') && $('haveBak').checked ? T.bakNone : '—');
+}
+let mbOk = false, bakOk = false, bakName = '';
+/* ---------------------------------------------------------------- the browser check */
+function syscheck() {
+  const c = $('checks'); if (!c || !c.appendChild) return;
+  const ua = (W.navigator || navigator).userAgent || '';
+  const brands = ((navigator.userAgentData && navigator.userAgentData.brands) || []).map(b => b.brand).join(' ');
+  const chromium = /Chrome|Chromium|Edg\//.test(ua) || /Chrom|Edge/.test(brands);
+  const midiOk = !!navigator.requestMIDIAccess, secure = W.isSecureContext !== false;
+  c.innerHTML = '';
+  for (const [ok, label] of [[chromium, T.chkBrowser], [midiOk, T.chkMidi], [secure, T.chkSecure]]) {
+    const s = document.createElement('span'); s.className = 'chk' + (ok ? '' : ' no');
+    s.innerHTML = '<i>' + (ok ? '✓' : '!') + '</i>'; s.appendChild(document.createTextNode(label + (ok ? '' : ' · ' + T.chkNo))); c.appendChild(s);
+  }
+  const b = $('blocker'); if (b) { b.innerHTML = T.block; show('blocker', !midiOk || !secure); }
+}
+/* ---------------------------------------------------------------- the frames (m-bootloader docs/SPEC.md 11.6) */
+function frame(cmd, body) {
+  const raw = [0, 0x59, cmd, body.length & 255, body.length >> 8 & 255, body.length >> 16 & 255, ...body];
+  let sum = 0; for (const b of body) sum += b; raw.push(~sum & 255);
+  const out = [0xF0]; let acc = 0, bits = 0;
+  for (const b of raw) { acc |= b << bits; bits += 8; while (bits >= 7) { out.push(acc & 127); acc >>= 7; bits -= 7; } }
+  if (bits) out.push(acc & 127);
+  out.push(0xF7); return out;
+}
+function unpack(data) {
+  const out = []; let acc = 0, bits = 0;
+  for (const b of data) { acc |= (b & 127) << bits; bits += 7; if (bits >= 8) { out.push(acc & 255); acc >>= 8; bits -= 8; } }
+  return out;
+}
+const le32 = (a, i) => (a[i] | a[i + 1] << 8 | a[i + 2] << 16 | a[i + 3] << 24) >>> 0;
+let midi, out, inp, pk, state = 'idle', key = -1, served = 0, total = 0, cap = 0x100000, waiter = null, t0 = 0, devInfo = {};
+const FINISH = 0xF0000000;
+const ascii = (m, i) => { let s = ''; for (; i < m.length - 1 && m[i]; i++) s += String.fromCharCode(m[i]); return s; };
+function answer(m, data) { out.send(frame(0x30, [m[6], m[7], m[8], m[9], m[10], m[11], m[12], m[13], ...data])); }
+const secs = s => s >= 60 ? Math.floor(s / 60) + ' min ' + String(Math.round(s % 60)).padStart(2, '0') + ' s' : Math.max(1, Math.round(s)) + ' s';
+function phase(n) { for (let i = 1; i <= 3; i++) { const e = $('ph' + i); if (e) e.className = 'phase' + (i < n ? ' done' : i === n ? ' now' : ''); } }
+function onMsg(e) {
+  const d = e.data; if (d[0] !== 0xF0) return;
+  const m = unpack(d.slice(1, d.length - 1));
+  if (m.length < 7 || m[1] !== 0x59) return;
+  if (m[2] === 0x23 && waiter) { const w = waiter; waiter = null; w(m); return; }
+  if (m[2] === 0x12 && state === 'asking') {               /* MBOOT, protocol, kind, flags, key, capacity, JEDEC, ..., version */
+    if (String.fromCharCode(...m.slice(6, 11)) !== 'MBOOT') { say(T.notmb, 'bad'); state = 'idle'; return; }
+    key = m[14] | m[15] << 8; cap = le32(m, 16) || 0x100000;
+    const ver = ascii(m, 6 + 28);
+    log(T.mb + ver + (m[12] === 2 ? T.stage : '') + T.key + key.toString(16).toUpperCase().padStart(4, '0'), 'ok');
+    pk = buildPackage(AREA, key);
+    const bad = checkPackage(pk, key);
+    if (bad) { problem('err3', fmt(T.badpkg, { e: bad }), ''); state = 'idle'; return; }
+    total = pk.size;
+    devInfo = { v: ver || '?', k: key.toString(16).toUpperCase().padStart(4, '0'), f: Math.round(cap / 1024) + (lang === 'fr' ? ' Ko' : ' KB') };
+    if ($('devMeta')) $('devMeta').textContent = fmt(T.devMeta, devInfo);
+    show('waiting', false); show('device', true); show('err3', false);
+    say(fmt(T.fwready, { n: AREA.length }), 'ok');
+    state = 'ready'; refresh();
+  } else if (m[2] === 0x30 && state === 'install') {      /* the unit reads the package */
+    const addr = le32(m, 7), len = m[11] | m[12] << 8 | m[13] << 16;
+    if (addr === FINISH) {
+      answer(m, new Array(len).fill(0));
+      state = 'done'; $('fill').style.width = '100%'; if ($('ipct')) $('ipct').textContent = '100 %'; phase(4);
+      say(T.done, 'ok'); releaseWake();
+      done6 = true; stepState(5, 'done'); go(6); stepState(6, 'done');
+      return;
+    }
+    const part = new Array(len).fill(0xFF);
+    for (let i = 0; i < len; i++) if (addr + i < pk.pkg.length) part[i] = pk.pkg[addr + i];
+    answer(m, part);
+    if (addr >= pk.flashAt) {
+      served += len;
+      /* it reads it all once to check it (nothing is erased yet), then again sector by sector to write */
+      const check = total + 32, all = check + total - 0x4000;
+      const f = Math.min(0.99, served / all), pct = Math.floor(f * 100);
+      $('fill').style.width = pct + '%';
+      if ($('ipct')) $('ipct').textContent = pct + ' %';
+      const el = (Date.now() - t0) / 1000; if ($('ieta') && f > 0.03) $('ieta').textContent = fmt(T.left, { s: secs(el / f * (1 - f)) });
+      const ph = served <= check ? 1 : f < 0.985 ? 2 : 3;
+      if (ph !== lastPh) { lastPh = ph; phase(ph); log((ph === 1 ? T.check : T.write) + '...'); }
+    }
+  } else if (m[2] === 0 && state === 'install') {
+    problem('err5', fmt(T.refused, { c: m[6] }) + (served <= total + 32 ? T.intact : ''), T.refusedFix);
+    state = 'idle'; releaseWake(); show('iprog', false); refresh(); if ($('b5')) $('b5').disabled = false;
+  }
+}
+let lastPh = 0, hintT = 0;
+function attach(o, i) {
+  if (inp) inp.onmidimessage = null;
+  out = o; inp = i; inp.onmidimessage = onMsg;
+}
+const port = (re) => [[...midi.outputs.values()].find(p => re.test(p.name) && p.state !== 'disconnected'), [...midi.inputs.values()].find(p => re.test(p.name) && p.state !== 'disconnected')];
+function tryPort() {
+  const [o, i] = port(/FM-1 Update/i);
+  if (!o || !i) return false;
+  attach(o, i);
+  state = 'asking'; clearTimeout(hintT); show('err3', false); show('waiting', false); say(T.found + out.name + T.reading);
+  out.send(frame(0x12, []));
+  setTimeout(() => { if (state === 'asking') { state = 'waiting'; problem('err3', T.noans, T.noansFix); } }, 3000);
+  return true;
+}
+$('con').onclick = async () => {
+  try {
+    if (!navigator.requestMIDIAccess) { problem('err3', T.nomidi, ''); return; }
+    try { midi = midi || await navigator.requestMIDIAccess({ sysex: true }); }
+    catch (e) { problem('err3', T.denied, T.deniedFix); return; }
+    if (tryPort()) return;
+    state = 'waiting'; show('waiting', true); show('device', false); show('err3', false);
+    const st = $('status'); st.textContent = ''; st.className = 'status';
+    const names = () => [...midi.outputs.values()].map(p => p.name);
+    const firmware = () => names().some(n => /SLOOP|Felucca|CRITICAL|FM-1|ota-/i.test(n) && !/FM-1 Update/i.test(n));
+    if (firmware()) problem('err3', T.running, T.runningFix);
+    clearTimeout(hintT);
+    hintT = setTimeout(() => { if (state === 'waiting' && !firmware()) problem('err3', fmt(T.noport, { n: names().join(', ') || '—' }), T.noportFix); }, 8000);
+    midi.onstatechange = () => { if (state === 'waiting') setTimeout(() => { if (state === 'waiting' && !tryPort() && firmware()) problem('err3', T.running, T.runningFix); }, 400); };
+  } catch (err) { problem('err3', T.err + err.message, ''); }
+};
+/* ---------------------------------------------------------------- keeping the screen on, the tab in front */
+let wake = null;
+async function holdWake() { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) {} }
+function releaseWake() { try { if (wake) wake.release(); } catch (e) {} wake = null; }
+if (W.addEventListener) {
+  W.addEventListener('beforeunload', e => { if (busy()) { e.preventDefault(); e.returnValue = T.leave; return T.leave; } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'install') log(T.hidden, 'bad'); else if (!document.hidden && state === 'install') toast(T.hidden); });
+}
+$('go').onclick = () => {
+  if (state !== 'ready') return;
+  state = 'install'; served = 0; lastPh = 0; t0 = Date.now();
+  show('iprog', true); show('err5', false); phase(1); if ($('b5')) $('b5').disabled = true;
+  refresh(); go(5); holdWake();
+  say(T.inst);
+  out.send([0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7]);
+};
+/* the backup: the whole flash as stored, 512 bytes a read (command 0x23; nothing written) */
+function read23(addr, n) {
+  return new Promise((res, rej) => {
+    const t = setTimeout(() => { waiter = null; rej(new Error('timeout')); }, 2000);
+    waiter = m => { clearTimeout(t); res(m); };
+    out.send(frame(0x23, [0, addr & 255, addr >> 8 & 255, addr >> 16 & 255, addr >>> 24, n & 255, n >> 8 & 255, 0]));
+  });
+}
+$('bak').onclick = async () => {
+  if (state !== 'ready') return;
+  state = 'backup'; show('bprog', true); show('err4', false); show('bdone', false); refresh(); go(4); say(T.bstart);
+  $('bak').disabled = true;
+  const img = new Uint8Array(cap); let a = 0, tries = 0; const tb = Date.now();
+  while (a < cap) {
+    try {
+      const m = await read23(a, 512);
+      if (le32(m, 7) !== a || m.length < 14 + 512) throw new Error('reply');
+      img.set(m.slice(14, 14 + 512), a); a += 512; tries = 0;
+      if ((a & 0x3FFF) === 0) {
+        const f = a / cap; $('bfill').style.width = Math.floor(f * 100) + '%'; $('bpct').textContent = Math.floor(f * 100) + ' %';
+        $('beta').textContent = fmt(T.kb, { a: a >> 10, b: cap >> 10 }) + ' · ' + fmt(T.left, { s: secs((Date.now() - tb) / 1000 / f * (1 - f)) });
+      }
+    } catch (e) { if (++tries > 3) { problem('err4', fmt(T.bfail, { a: a.toString(16) }), T.bfailFix); break; } }
+  }
+  if (a >= cap) {
+    const name = 'fm1-backup-' + key.toString(16).toUpperCase().padStart(4, '0') + '-' + new Date().toISOString().slice(0, 10) + '.bin';
+    const url = URL.createObjectURL(new Blob([img], { type: 'application/octet-stream' }));
+    const ln = document.createElement('a'); ln.href = url; ln.download = name; document.body.appendChild(ln); ln.click(); ln.remove && ln.remove();
+    bakOk = true; bakName = name; $('bname').textContent = name; show('bdone', true); show('bprog', false);
+    say(T.bdone + name, 'ok');
+  } else show('bprog', false);
+  state = 'ready'; $('bak').disabled = false; refresh(); go(4);
+};
+/* ---------------------------------------------------------------- the buttons */
+$('ok1').onchange = refresh;
+$('haveBak').onchange = refresh;
+$('n1').onclick = () => go(2);
+$('mbYes').onclick = () => { mbOk = true; $('mbYes').setAttribute('aria-pressed', 'true'); $('mbNo').setAttribute('aria-pressed', 'false'); show('mbGuide', false); refresh(); go(3); };
+$('mbNo').onclick = () => { $('mbNo').setAttribute('aria-pressed', 'true'); $('mbYes').setAttribute('aria-pressed', 'false'); show('mbGuide', true); };
+$('mbDone').onclick = () => { mbOk = true; refresh(); go(3); };
+$('n2').onclick = () => go(3);
+$('n3').onclick = () => go(4);
+$('n4').onclick = () => go(5);
+for (const b of (document.querySelectorAll ? document.querySelectorAll('[data-back]') : [])) b.onclick = () => { if (!busy()) go(+b.dataset.back); };
+for (const b of (document.querySelectorAll ? document.querySelectorAll('[data-go]') : [])) b.onclick = () => { if (!busy()) go(+b.dataset.go); };
+$('lang-en').onclick = () => setLang('en');
+$('lang-fr').onclick = () => setLang('fr');
+let saved = null; try { saved = localStorage.getItem('sloop3-lang'); } catch (e) {}
+setLang(saved || (/^fr/i.test(navigator.language || '') ? 'fr' : 'en'));
+say(T.ready);
+</script></body></html>
