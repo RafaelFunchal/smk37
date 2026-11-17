@@ -34,6 +34,7 @@ def main():
     ap.add_argument('--limit', type=auto_int, default=0xC0000, help='flash address the image must end by (default 0xC0000)')
     ap.add_argument('--hole', default='0xC0000:0xC2000', help='lo:hi, flash no sample may use (the keyboard calibration)')
     ap.add_argument('--no-flat', action='store_true', help="no loop levels table (the loops pulse as recorded): for comparisons")
+    ap.add_argument('--no-steady', action='store_true', help="the loops as recorded, their strings beating (no steady pass): for comparisons")
     a = ap.parse_args()
     hole_lo, hole_hi = (int(x, 0) for x in a.hole.split(':'))
 
@@ -103,6 +104,7 @@ def main():
     rel2 = [put(s) for s in rel]
     while len(out) % 4:
         out.append(0xFF)
+    if not a.no_steady: steady(out, smp2, keys, NKEYS)       # (out and smp2 rewritten in place, before the headers: same sizes)
 
     img = bytearray(struct.pack(HDR, MAGIC, nz2, 2, nr, 0, len(out), rel_gain, 0))
     for k in keys:
@@ -176,6 +178,67 @@ def flat_table(data, smps):
             t.append(int(round(g * 64)))
     print('mkpiano: loops evened out (the largest correction %.1f dB)' % worst)
     return t
+
+
+# ---- the loops made steady (the chorus players hear): a loop is periodic, so all it holds lies on the lines k / T of
+# its length T. A partial's two or three strings, slightly apart, are two or three neighbouring lines there: they beat,
+# and the loop repeats that beating 2 to 7 times a second, the partial swelling and fading (a chorus, notes that seem
+# to waver). Each partial's cluster of lines is merged into its strongest line (the cluster's energy kept, its phase):
+# every partial then sounds at one steady level. Lines a cluster: within 0.3 of the sample's fundamental. The attack
+# before the loop is left as recorded, crossfaded over its last 60 ms into the steady loop (extended backwards, as it
+# is periodic: the loop's own junction needs no crossfade). Re-encoded with Erik37's encoder (tools/erkcodec.c), the
+# decoder's history at the loop's start taken from its exact decode. Sizes unchanged.
+def steady(data, smps, keys, nkeys):
+    import math, subprocess, tempfile
+    import numpy as np
+    here = os.path.dirname(os.path.abspath(__file__))
+    tmp = tempfile.mkdtemp(prefix='mkpiano-')
+    codec = os.path.join(tmp, 'erkcodec')
+    subprocess.check_call(['cc', '-O2', '-o', codec, os.path.join(here, 'erkcodec.c'), '-lm'])
+    nl = 2
+    roots = {}
+    for k, kk in enumerate(keys):                         # each zone's root, from a key's inc and its sample's rate
+        z, inc = kk[10], kk[5]
+        if z not in roots and inc:
+            rate = smps[z * nl][6]
+            roots[z] = 21 + k - 12 * math.log2(inc * 44100.0 / (65536.0 * rate))
+    merged = 0
+    for i, s in enumerate(smps):
+        off, ln, loop, llen, h1, h2, rate, gain = s
+        if not llen:
+            continue
+        x = np.array(decode(data, off, loop + llen))
+        L = x[loop:loop + llen]; N = len(L)
+        X = np.fft.rfft(L); mag = np.abs(X); df = rate / N
+        f0 = 440.0 * 2 ** ((roots.get(i // nl, 60) - 69) / 12)
+        w = max(1, int(0.3 * f0 / df))
+        Y = np.zeros_like(X); taken = np.zeros(len(X), bool)
+        for b in np.argsort(-mag):
+            if taken[b]:
+                continue
+            lo, hi = max(0, b - w), min(len(X), b + w + 1)
+            free = ~taken[lo:hi]
+            e = np.sum(mag[lo:hi][free] ** 2)
+            Y[b] = math.sqrt(e) * (X[b] / mag[b] if mag[b] > 0 else 1.0)
+            taken[lo:hi] = True; merged += int(np.count_nonzero(free)) - 1
+        y = np.fft.irfft(Y, N)
+        R_ = min(loop, int(0.06 * rate))                  # the attack's end into the steady loop
+        z = np.concatenate([x[:loop], y])
+        if R_ > 0:
+            a = 0.5 - 0.5 * np.cos(np.pi * (np.arange(R_) + 1) / R_)
+            ext = y[(np.arange(R_) - R_) % N]
+            z[loop - R_:loop] = (1 - a) * x[loop - R_:loop] + a * ext
+        pk = np.max(np.abs(z)); sc = min(1.0, 32000.0 / pk) if pk > 0 else 1.0
+        z16 = np.clip(np.round(z * sc), -32768, 32767).astype('<i2')
+        z16.tofile(os.path.join(tmp, 'in.s16'))
+        subprocess.check_call([codec, 'enc', os.path.join(tmp, 'in.s16'), os.path.join(tmp, 'o.bin'), os.path.join(tmp, 'd.s16')])
+        enc = open(os.path.join(tmp, 'o.bin'), 'rb').read(); dec = np.fromfile(os.path.join(tmp, 'd.s16'), '<i2')
+        nbytes = (loop + llen + 31) // 32 * 17
+        assert len(enc) == nbytes, (len(enc), nbytes)
+        data[off:off + nbytes] = enc
+        g = int(round(gain / sc)); g = 65535 if g > 65535 else g
+        smps[i] = [off, ln, loop, llen, int(dec[loop - 1]) if loop else 0, int(dec[loop - 2]) if loop > 1 else 0, rate, g]
+    print('mkpiano: loops made steady (%d lines merged into their partials)' % merged)
 
 
 if __name__ == '__main__':
