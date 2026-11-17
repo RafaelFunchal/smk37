@@ -1,5 +1,12 @@
 # SLOOP 3: the guide
 
+> **On an M-VAVE SMK-37?** This guide is the FM-1's, and it holds there too: the same pages, sounds, sequencer and
+> editor. Read **[SMK37.md](../SMK37.md)** first. It covers installing on the SMK-37 (its own installer), its controls
+> (the FM-1's buttons on the SMK-37's printed ones, K1 as MASTER, **SEQ PLAY** held at power-on for m-bootloader), and
+> what differs: 24 voices, one sample slot (USR1), no SLOOP 2.8 import, no button calibration, TRS MIDI OUT only, no
+> Bluetooth. It also covers what only the SMK-37 has: the PIANO engine, layers and splits, the pads' CONTROL (sound
+> slots, SOLO, LAYER, SPLIT, TAP) or DRUMS, and its SETTINGS and PANEL TEST pages.
+
 > **SLOOP 3 is a public beta.** It was rewritten from scratch: a new sound engine, a new sequencer and a new
 > interface. It is being tested on real FM-1s now. Expect bugs, keep backups, and please
 > [report what you find](https://github.com/isod89/sloop3-fm1/issues). Prefer the tried and tested version?
