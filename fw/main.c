@@ -4122,6 +4122,13 @@ COLD __attribute__((noinline)) static void ui_round(void)
         if (pot >= 0 && ed_mst >= 0 && (pot > ed_mst_pot + 40 || pot < ed_mst_pot - 40)) ed_mst = -1;   /* (the knob turned: back to it) */
         if (pot >= 0 && ed_mst < 0) { float x = (float)pot * (1.0f / 1023.0f); sm_set(&S.master, 0.5f * x * x); ed_mst_pot = pot; }
         else if (ed_mst >= 0) { float x = (float)ed_mst * (1.0f / 126.0f); sm_set(&S.master, 0.5f * x * x); }
+#if BOARD_SMK37
+        {   /* (K1 is MASTER here, a knob, not the FM-1's pot: turned, it says so, the screen showing what is touched) */
+            static int last = -1;
+            if (pot >= 0 && last >= 0 && pot != last) { char m[16]; *put_u(put_s(m, "VOLUME "), (uint32_t)(pot * 100 / 1023)) = 0; say(m); t_input = now; }
+            if (pot >= 0) last = pot;
+        }
+#endif
     }
     {                                               /* the delay's time follows the tempo */
         static float dly_want;

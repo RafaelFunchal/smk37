@@ -2288,6 +2288,9 @@ static void sc_smk(void)
     tw_pad(3, 90); wait_ms(60); shot("smk-panel-test"); tw_pad(3, 0); wait_ms(60);
     lr_together();
     EXPECT(sticky == pg0, "< > a third time: not back (%d, was %d)", sticky, pg0);
+    /* K1, MASTER: turned, the screen says the volume */
+    { extern int tw_pot; m = msg_mark(); int p0 = tw_pot; tw_pot = p0 + 48; wait_ms(120);
+      EXPECT(said_since(m, "VOLUME "), "K1 (MASTER) turned: no VOLUME on the screen"); tw_pot = p0; wait_ms(120); }
     /* HOME > SCREEN > TEXT: LARGE (kept with the project, sc_smk_reboot) */
     m = msg_mark(); home_knob(1, 2, 1); wait_ms(100);
     EXPECT(ui_large == 1 && said_since(m, "TEXT: LARGE"), "HOME > SCREEN > TEXT: not LARGE (%d)", ui_large);
