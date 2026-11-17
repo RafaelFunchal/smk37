@@ -116,12 +116,14 @@ typedef struct {
     float glo, ghi;                 /* the shelves' gains - 1 */
     float w0s, w1s, wend;           /* the layer handover: the start weights, the kept one's final weight */
     float inc;                      /* source samples an output frame at the key's pitch, Q16 */
+    uint8_t wait_rel;               /* (PS_WAIT) let go before it could begin */
     uint32_t blocks;                /* 32-sample blocks since the start (Erik37's units) */
     uint16_t rblocks, knee;
     uint8_t key, state, flags, nst, keep, xfd, gen, rel;
 } pvoice;
 _Static_assert(sizeof(pvoice) <= sizeof(((gb_voice *)0)->s.raw), "PIANO's voice fits gb_voice.s");
-enum { PS_DEAD, PS_ON, PS_REL, PS_RING, PS_NOISE };     /* NOISE: the note has ended, its damper noise goes on */
+enum { PS_DEAD, PS_ON, PS_REL, PS_RING, PS_NOISE,        /* NOISE: the note has ended, its damper noise goes on */
+       PS_WAIT };                                       /* WAIT: started while a save had the flash: begins once it is back */
 #define PV(v) ((pvoice *)(void *)(v)->s.raw)
 
 static const erk_smp *smp_of(uint8_t si) { return si & SI_REL ? &bk.rel[si & 0x7Fu] : &bk.smp[si]; }
@@ -217,13 +219,14 @@ static const struct { float bright, lo_db, hi_db; int16_t detune; } TONE[4] = {
 };
 static const float CURVE_EXP[3] = { 0.55f, 0.95f, 1.7f };
 
-GB_SMALL static void pn_start(gb_voice *v, const gb_patch *p, int fresh)
+static void pn_release(gb_voice *v, const gb_patch *p);
+/* the note itself, the flash readable (its tables and samples are there) */
+GB_SMALL static void pn_begin(gb_voice *v, const gb_patch *p)
 {
-    (void)fresh;
     pvoice *q = PV(v);
     memset(q, 0, sizeof *q);
     q->state = PS_DEAD;
-    if (!bank_ok || !gb_flash_ok) return;           /* (a save: the tables are in the flash too; silent) */
+    if (!bank_ok) return;
     int key = gb_clampi((int)v->note, ERK_KEY0, ERK_KEY0 + ERK_KEYS - 1) - ERK_KEY0;
     const erk_key *k = &bk.key[key];
     int tone = ev(p, 0), curve = ev(p, 2);
@@ -290,9 +293,20 @@ GB_SMALL static void pn_start(gb_voice *v, const gb_patch *p, int fresh)
     q->g = q->env * q->amp;                         /* start at the target: keep the hammer's transient */
     q->state = PS_ON;
 }
+/* a note asked for while a save has the flash window off (found on the first SMK-37: a chord played as the autosave
+ * began lost its piano notes): kept waiting, begun as soon as the flash is back (fw/main.c ends an autosave at a key);
+ * let go meanwhile, it begins and is let go at once */
+GB_SMALL static void pn_start(gb_voice *v, const gb_patch *p, int fresh)
+{
+    (void)fresh;
+    pvoice *q = PV(v);
+    if (bank_ok && !gb_flash_ok) { memset(q, 0, sizeof *q); q->state = PS_WAIT; q->gen = bank_gen; return; }
+    pn_begin(v, p);
+}
 
 GB_SMALL static void pn_release(gb_voice *v, const gb_patch *p)
 {
+    if (PV(v)->state == PS_WAIT) { PV(v)->wait_rel = 1; return; }   /* (it begins once the flash is back, then is let go) */
     pvoice *q = PV(v);
     if (q->state != PS_ON) return;
     if (q->flags & ERK_NODAMP) { q->state = PS_RING; return; }   /* no damper: rings on at its decay */
@@ -313,6 +327,12 @@ GB_HOT static int pn_render(gb_voice *v, const gb_patch *p, const gb_mod *md, fl
     for (int i = 0; i < GB_BLOCK; i++) out[i] = 0.0f;
     if (q->state == PS_DEAD || !bank_ok || q->gen != bank_gen) return 0;
     if (!gb_flash_ok) return 1;                     /* (a save: nothing read; silent, the voice waits as it is) */
+    if (q->state == PS_WAIT) {                       /* (the flash back: the note waited for begins now) */
+        int let_go = q->wait_rel;
+        pn_begin(v, p);
+        if (q->state == PS_DEAD) return 0;
+        if (let_go) pn_release(v, p);
+    }
     if (q->state != PS_NOISE) {
         float buf[GB_BLOCK];
         /* the envelope at the block's end */

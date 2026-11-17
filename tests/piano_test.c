@@ -185,15 +185,21 @@ static void flash_test(void)
     int alive = vrender(&v, 64, 100, B1, &fin);
     CHECK(alive && peak(B1, 100 * GB_BLOCK) == 0.0f, "a voice not silent while the flash is off");
     CHECK(memcmp(&keep, &v, sizeof v) == 0, "a voice moved on while the flash was off");
-    vstart(&w, 67, 0.9f);                                        /* a note started then: silent, and over */
+    vstart(&w, 67, 0.9f);                                        /* a note started then: it waits, silent (nothing read) */
     alive = vrender(&w, 67, 2, B1, &fin);
-    CHECK(!alive && peak(B1, 2 * GB_BLOCK) == 0.0f, "a note started while the flash is off sounded");
+    CHECK(alive && peak(B1, 2 * GB_BLOCK) == 0.0f, "a note started while the flash is off: not waiting silently");
+    gb_voice x; vstart(&x, 69, 0.9f); vrelease(&x);              /* one started and let go then: begins, then let go */
     vrelease(&v);                                                /* released then: its noise waits for the flash */
     alive = vrender(&v, 64, 10, B1, &fin);
     CHECK(alive && peak(B1, 10 * GB_BLOCK) == 0.0f, "a voice released while the flash is off");
     flash(1);
     vrender(&v, 64, S(0.3f), B1, &fin);
     CHECK(fin && peak(B1, S(0.3f) * GB_BLOCK) > 1e-4f, "the voice did not come back with the flash");
+    alive = vrender(&w, 67, S(0.3f), B1, &fin);                 /* (the note that waited: it begins, it sounds) */
+    CHECK(alive && fin && peak(B1, S(0.3f) * GB_BLOCK) > 1e-3f, "a note started while the flash was off: lost (it must begin once it is back)");
+    float pk_held = peak(B1, S(0.3f) * GB_BLOCK);
+    vrender(&x, 69, S(0.3f), B1, &fin);
+    CHECK(fin && peak(B1, S(0.3f) * GB_BLOCK) > 1e-4f && peak(B1, S(0.3f) * GB_BLOCK) <= pk_held * 4.0f, "a note let go while waiting: not begun and let go");
     /* the bank gone: silence, the voices end */
     vstart(&v, 60, 0.8f); vrender(&v, 60, 10, 0, 0);
     piano_bank_set(0);
