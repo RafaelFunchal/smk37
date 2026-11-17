@@ -92,6 +92,7 @@ static int smk_kb_held(void);
 static int smk_keys_setup_key(int k);
 static void smk_keys_setup_knobs(void);
 static void smk_keys_init(void);
+static uint32_t smk_as_hits;                      /* (the panel's press count when the last save began: an autosave stops at a press) */
 static int8_t smk_layer, smk_lower, smk_split;  /* (fw/smk.inc: KEYS, kept with the project: proj_extra, home_from) */
 static uint8_t smk_kv, smk_sens, smk_light, smk_krev;   /* (fw/smk.inc: the SMK-37's settings, kept with the project too) */
 static void smk_settings_apply(void);
@@ -1887,6 +1888,9 @@ COLD static void save_project(int shown)
     if (!shown && crc == saved_crc && n == saved_len) return;     /* nothing changed */
     if (store_proj_begin(n, crc, 1)) { if (shown) say_bad("SAVE: ERROR"); return; }
     saving = 1; saving_shown = shown; saving_snd = 0; saved_crc = crc; saved_len = n; saving_len = n;
+#if BOARD_SMK37
+    smk_as_hits = smk_hits();                             /* (a key or pad pressed after this ends an autosave: the main loop) */
+#endif
 }
 /* the save asks for the project's next part (store_step 3): made into sbuf from the project as it is now */
 COLD static void proj_feed(void)
@@ -4478,6 +4482,17 @@ int app_main(uint32_t arg)
             int rt = scope_one ? trk : 0; Q.lead = (uint8_t)rt;          /* (3.3.7: its pattern's end is the change point) */
             if (Q.t[rt].next == SEQ_NONE) { chain_pos = (uint8_t)((chain_pos + 1u) % chain_n); seq_queue(&Q, scope_one ? trk : -1, chain[chain_pos]); }
         }
+#if BOARD_SMK37
+        /* (an autosave, and a key or a pad played meanwhile: it stops at once, the flash back within one sector's erase,
+         * so the piano's notes begin; the copy it was writing has no header, the last saved one is kept; it is tried
+         * again later. Found on the first SMK-37: a chord played as the autosave began lost its notes) */
+        /* (the UI that takes the keys is flash code: it does not run while the save keeps the window off, so the
+         * panel's own count is watched; the abort is flash code too: once the operation under way is over) */
+        if (saving && !saving_shown && !saving_snd && !ed_wr.on && smk_hits() != smk_as_hits && !flash_busy()) {
+            store_proj_abort(); saving = 0; t_autosave = time_ticks();
+            saved_crc = 0;                                  /* (not saved: the next autosave must not take it as done) */
+        }
+#endif
         if (saving) {                                       /* a save: one flash operation at a time, never a wait */
             crumb_at(W_SAVE);
             int r = store_step();

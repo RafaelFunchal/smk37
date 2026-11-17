@@ -40,6 +40,9 @@ int smk_pad_raw(int pad);
 int smk_wheel_raw(int w);
 int smk_pedal_raw(void);
 int smk_last_hit(void);
+/* (RAM code: read while a save has the window off) a count of the key and pad presses, wrapping: an autosave stops
+ * when it moves */
+uint32_t smk_hits(void);
 /* the factory calibration, read once the flash is open (never written): 1 the unit's curves, 0 the defaults */
 int smk_trim_read(void);
 /* the panel's diagnostics: frames scanned, conversions read / missed */

@@ -59,6 +59,7 @@ static volatile uint8_t pad_sens = 1;               /* PAD SENS: 0 LOW .. 3 MAX 
 static const uint8_t PAD_ON[4] = { 20, 32, 48, 72 };  /* (SLOOP Pro's PAD THRESHOLD) */
 static volatile int8_t enc_dir = 1;                 /* KNOBS: 1 as built, -1 the other way (a unit wired so) */
 static volatile uint16_t pad_rawv[16];              /* (PANEL TEST) each pad's last reading */
+static volatile uint8_t hits;                      /* (smk_hits) presses counted, keys and pads: read while a save works */
 static volatile uint16_t last_hit;                  /* (PANEL TEST) the last key (0..36) or pad (0x40 + p) << 8 | velocity */
 static volatile uint16_t extq[32]; static volatile uint8_t extq_w, extq_r;
 /* the lights: buttons and white keys, a level each 0..4 (4 full); `full` from panel_led, `soft` from glow / level */
@@ -130,7 +131,7 @@ static void notes_now(void)
 }
 static void key_event(uint32_t k, uint32_t vel)    /* keybed key 0..36, vel 0 = let go */
 {
-    if (vel) last_hit = (uint16_t)(k << 8 | vel);
+    if (vel) { last_hit = (uint16_t)(k << 8 | vel); hits++; }
     if (k >= SMK_KEY_F3 && k < SMK_KEY_F3 + 27u) {
         uint32_t b = 1u << (k - SMK_KEY_F3);
         if (vel) { key_vel[k - SMK_KEY_F3] = (uint8_t)vel; knotes |= b; } else knotes &= ~b;
@@ -141,7 +142,7 @@ static volatile uint8_t pad_drums;                 /* (smk_pad_mode) the pads to
 static uint16_t pad_down;                           /* pads held (any mode) */
 static void pad_event(uint32_t p, int vel)         /* hardware pad p: a hit (1..127) or let go (-1) */
 {
-    if (vel > 0) { pad_down |= (uint16_t)(1u << p); last_hit = (uint16_t)((0x40u + p) << 8 | (uint32_t)vel); }
+    if (vel > 0) { pad_down |= (uint16_t)(1u << p); last_hit = (uint16_t)((0x40u + p) << 8 | (uint32_t)vel); hits++; }
     else pad_down &= (uint16_t)~(1u << p);
     if (vel > 0 && pad_drums) { pad_note[p] = 0x80u; extq_put(0x40u + p, (uint32_t)smk_vel_apply(vel_mode, vel)); return; }
     if (vel < 0 && pad_note[p] == 0x80u) { pad_note[p] = 0; extq_put(0x40u + p, 0); return; }   /* (its release goes where its hit went) */
@@ -413,6 +414,7 @@ int smk_pad_raw(int p) { return p >= 0 && p < 16 ? pad_rawv[p] : 0; }
 int smk_wheel_raw(int w) { return w >= 0 && w < 2 ? wheel_raw[w] : 0; }
 int smk_pedal_raw(void) { return pedal_raw; }
 int smk_last_hit(void) { return last_hit; }
+uint32_t smk_hits(void) { return hits; }
 void smk_pad_mode(int drums) { pad_drums = (uint8_t)(drums != 0); }
 int smk_pad_held(int p) { return p >= 0 && p < 16 && ((pad_down >> p) & 1u); }
 int smk_key_vel(int k) { return k >= 0 && k < 27 && key_vel[k] ? key_vel[k] : 100; }

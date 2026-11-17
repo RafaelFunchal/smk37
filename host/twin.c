@@ -2430,6 +2430,19 @@ static void sc_smk_autosave(void)
     for (int i = 0; i < 1000 && tw_erases == e0; i++) wait_ms(10);
     EXPECT(tw_erases > e0, "the autosave never came once the note had ended");
     wait_saved(3000);
+    /* a key played while the autosave writes: the save stops, the note is heard at once; the project saved later */
+    apply_preset(t, preset_named("STUDIO GRND")); wait_ms(100);
+    sm_set(&S.trk[t].send_rev, 0.0f); sm_set(&S.trk[t].send_dly, 0.0f); sm_set(&S.trk[t].send_cho, 0.0f);
+    int began = 0; for (int i = 0; i < 6000 && !began; i++) { wait_ms(5); began = saving && !saving_shown; }
+    EXPECT(began, "no autosave began (to play over)");
+    wait_ms(60);                                             /* (it is erasing now) */
+    tw_vel[7] = 100; keydown(7); double pk = peak_over(150); keyup(7);
+    printf("[%8.3f]    a key played while the autosave writes: peak %.4f in 150 ms; still saving: %d\n", tw_s(), pk, saving);
+    EXPECT(pk > 0.002, "a key played while the autosave writes: no sound within 150 ms (%.4f)", pk);
+    EXPECT(!saving || saving_shown, "the autosave did not stop for the key");
+    uint32_t m = msg_mark();
+    EXPECT(wait_msg(m, "PROJECT SAVED", 40000), "after the stopped autosave, the project was never saved");
+    check_project_roundtrip("after a stopped autosave and the next");
 }
 #endif
 static const struct { const char *name; void (*fn)(void); } SC[] = {

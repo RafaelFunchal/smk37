@@ -434,6 +434,10 @@ void smk_knob_dir(int r) { tw_knob_rev = r; }
 int smk_pad_raw(int p) { return p >= 0 && p < 16 && ((pad_down >> p) & 1u) ? 700 : 100; }
 int smk_wheel_raw(int w) { return w ? 600 : 535; }
 int smk_pedal_raw(void) { return 985; }
+uint32_t smk_hits(void)                              /* (the twin: the keys' and pads' presses since the last call) */
+{
+    static uint32_t prev, n; n += (uint32_t)__builtin_popcount(tw_keys & ~prev); prev = tw_keys; return n;
+}
 int smk_last_hit(void) { return pad_down ? (0x40 + __builtin_ctz(pad_down)) << 8 | 90 : tw_last_hit; }
 void smk_stats(uint32_t *f, uint32_t *ok, uint32_t *miss) { *f = 0; *ok = 0; *miss = 0; }
 int smk_enc_take(int k) { (void)k; return 0; }
