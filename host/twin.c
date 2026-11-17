@@ -2255,6 +2255,13 @@ static void sc_smk(void)
     keydown(2); wait_ms(80);
     EXPECT(sounding(t, 55) && !sounding(t2, 55) && !sounding(t3, 55), "KEYS off: G3 not on the track alone");
     keyup(2); wait_ms(80);
+    /* set again, to be saved with the project (sc_smk_reboot finds them) */
+    tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(60);
+    for (int i = 0; i < 8 && smk_layer != t2; i++) turn(ENC_ALGORITHM, 1);
+    keydown(5); wait_ms(40); keyup(5);
+    for (int i = 0; i < 8 && smk_lower != t3; i++) turn(ENC_PRESETS, 1);
+    tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
+    EXPECT(smk_layer == t2 && smk_lower == t3 && smk_split == 5, "KEYS set again: %d %d %d", smk_layer, smk_lower, smk_split);
     /* the project saved: only the SMK-37's data range written */
     select_track(t); trk = t;
     save_and_wait();
@@ -2269,6 +2276,13 @@ static void sc_smk_reboot(void)                  /* after sc_smk's flash: the pr
     EXPECT(piano_bank_ok(), "SMK-37: the piano lost");
     int t = synth_trk();
     EXPECT(S.trk[t].patch.engine == ENG_PIANO, "SMK-37: the track's piano not kept (engine %d)", S.trk[t].patch.engine);
+    EXPECT(smk_layer == smk_trk_shown(1) && smk_lower == smk_trk_shown(2) && smk_split == 5, "SMK-37: KEYS not kept with the project (layer %d, split's track %d, split %d)", smk_layer, smk_lower, smk_split);
+    keydown(9); wait_ms(80);
+    EXPECT(sounding(t, 62) && sounding(smk_layer, 62), "SMK-37: after the restart, the layer not heard");
+    keyup(9); wait_ms(80);
+    keydown(2); wait_ms(80);
+    EXPECT(sounding(smk_lower, 55) && !sounding(t, 55), "SMK-37: after the restart, the split not heard");
+    keyup(2); wait_ms(80);
     check_project_roundtrip("SMK-37 after the restart");
 }
 #endif

@@ -92,6 +92,7 @@ static int smk_kb_held(void);
 static int smk_keys_setup_key(int k);
 static void smk_keys_setup_knobs(void);
 static void smk_keys_init(void);
+static int8_t smk_layer, smk_lower, smk_split;  /* (fw/smk.inc: KEYS, kept with the project: proj_extra, home_from) */
 static uint64_t smk_sus_keys;
 #else
 #define SMK_LOWBSS
@@ -1685,6 +1686,12 @@ COLD static void proj_extra(project_extra *xp)
     x.home[40] = m_rmch; x.home[41] = m_fxch; x.home[42] = m_bend; x.home[75] = scr_color; x.home[76] = (uint8_t)(0x80u | vis_style);   /* (3.3.6: bit 7, one of the six) */
     for (int i = 0; i < ML_N; i++) { x.home[43 + 2 * i] = (uint8_t)(ml_tab[i] & 0xFF); x.home[44 + 2 * i] = (uint8_t)(ml_tab[i] >> 8); }
     if (cal_ok) { x.home[10] = 1; for (int i = 0; i < 14; i++) x.home[11 + i] = cal_btn[i]; for (int i = 0; i < 7; i++) { x.home[25 + i] = cal_enc[i]; x.home[32 + i] = (uint8_t)(cal_dir[i] > 0); } }
+#if BOARD_SMK37
+    /* (the SMK-37's KEYS, in the settings' free bytes: 77 the layer's track + 1, 78 the split's track + 1 (0: none),
+     * 79 the split point + 64 (0: none). Older projects have 0xFF there: none) */
+    x.home[77] = (uint8_t)(smk_layer + 1); x.home[78] = (uint8_t)(smk_lower + 1);
+    x.home[79] = (uint8_t)(smk_split > -100 ? smk_split + 64 : 0);
+#endif
     *xp = x;
 }
 COLD static uint32_t proj_measure(uint32_t *crc)          /* the project's length and CRC, nothing kept */
@@ -1739,6 +1746,11 @@ COLD static void home_from(const uint8_t *h)
     if (h[75] <= UI_NTHEMES) { scr_color = h[75]; color_apply(); }
     if (h[76] & 0x80u) { if ((h[76] & 0x7Fu) < VIS_N) vis_style = (uint8_t)(h[76] & 0x7Fu); } else if (h[76] < 12) vis_style = vis_from12[h[76]];   /* (3.3.6: the six; a style of the twelve, its place now) */
     for (int i = 0; i < ML_N; i++) { uint16_t e = (uint16_t)(h[43 + 2 * i] | h[44 + 2 * i] << 8); ml_tab[i] = e == 0xFFFF || (e >> 10) > ML_CHO || ((e >> 7) & 7) >= NTRK ? 0 : e; }
+#if BOARD_SMK37
+    smk_layer = h[77] >= 1 && h[77] <= NTRK ? (int8_t)(h[77] - 1) : -1;
+    smk_lower = h[78] >= 1 && h[78] <= NTRK ? (int8_t)(h[78] - 1) : -1;
+    smk_split = h[79] >= 64 - 5 && h[79] <= 64 + 31 ? (int8_t)(h[79] - 64) : -100;
+#endif
     if (h[10] == 1) {
         uint8_t b[14], e[7]; int8_t d[7];
         for (int i = 0; i < 14; i++) b[i] = h[11 + i];

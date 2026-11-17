@@ -76,7 +76,7 @@ them live (the screen says what is set each time):
   the sequencer playing the rest.
 
 The sustain pedal holds both parts of a layer. REC records the selected track (the split's and the layer's notes are
-heard, not recorded). The layer and the split are not kept over a restart yet.
+heard, not recorded). The layer and the split are saved with the project (and come back when it opens).
 
 ## The piano
 
