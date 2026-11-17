@@ -11,7 +11,11 @@ H=hal/fm1; HB=hal/fm1; [ $BOARD = smk37 ] && HB=hal/smk37
 rm -rf $O; mkdir -p $O/o
 CF="${BOOT_DIAG:+-DBOOT_DIAG}${BF:+ $BF} -mcpu=ac791n -O2 -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -Wall -Wextra -Wno-unused-parameter"
 for f in engine/sound.c engine/fx.c engine/common.c engine/va.c engine/drum.c engine/fm.c engine/lofi.c engine/pd.c engine/wheel.c engine/noise.c engine/voice.c engine/trio.c engine/phys.c engine/fm6.c engine/sample.c engine/grain.c engine/trackfx.c engine/texture.c engine/engines.c core/libc.c hal/fm1/audio.c ${BF:+engine/piano.c}; do
-  "$TC/clang" $CF -c $f -o $O/o/$(basename $f .c).o
+  F="$CF"
+  # the SMK-37: these built small (the RAM's room: the panel, the piano; 24 voices, so the peak load is no higher)
+  case "$BOARD:$f" in smk37:engine/phys.c|smk37:engine/fm6.c|smk37:engine/grain.c|smk37:engine/sample.c|smk37:engine/voice.c|\
+    smk37:engine/texture.c|smk37:engine/wheel.c|smk37:engine/trackfx.c|smk37:engine/pd.c|smk37:engine/fx.c|smk37:engine/piano.c) F=$(echo "$CF" | sed 's/-O2/-Os/');; esac
+  "$TC/clang" $F -c $f -o $O/o/$(basename $f .c).o
 done
 # the interface and the projects: small rather than fast (they run between audio blocks, with time to spare); the
 # master bus too (its loops run once a block, on the mix: not per voice); the hardware's drivers

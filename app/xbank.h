@@ -11,8 +11,13 @@
 #pragma once
 #include <stdint.h>
 #include "../engine/drum.h"
+#if BOARD_SMK37                                  /* (hal/smk37/smk37.h: the SMK-37's data, above the calibration) */
+#define XB_FM6_AT 0xD6000u
+#define XB_SYN_AT 0xD7000u
+#else
 #define XB_FM6_AT 0x78000u
 #define XB_SYN_AT 0x79000u
+#endif
 #define XB_NFM6 27u
 #define XB_FM6_LEN (16u + XB_NFM6 * 128u)
 #define XB_KIT_LEN (4u + 16u * 22u)

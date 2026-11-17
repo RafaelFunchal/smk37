@@ -13,6 +13,8 @@
 #include "../fm1/panel.h"
 #include "../fm1/irq.h"
 #include "../fm1/flash.h"
+#define XT __attribute__((section(".xtext.smkpanel")))   /* (main loop only, never while a save has the window off) */
+#define BOOTBSS __attribute__((section(".lowbss.smk")))  /* (not cleared at the start: panel_init and the flush write them) */
 
 /* ---- the tables (docs/01-hardware.md 5.2 .. 5.5, 6.2): matrix codes col << 4 | row */
 static const uint8_t KEYC[SMK_NKEY][2] = {
@@ -40,7 +42,7 @@ static const uint8_t WHITE_NOTE[16] = { 0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19
 static int8_t white_of[27];
 
 /* ---- the state (the interrupt writes; the main loop reads with it held off) */
-static smk_trim trim;
+static smk_trim trim BOOTBSS;
 static volatile uint8_t ticking;
 static uint8_t col, grp, raw[SMK_NCOL];
 static volatile uint32_t frames; static uint32_t frames_seen;
@@ -49,7 +51,7 @@ static uint32_t knotes, pnotes, notes, note_pr, note_rel;
 static uint8_t key_vel[27], ks_stab[SMK_NKEY], ks_rel[SMK_NKEY]; static uint32_t ks_t1[SMK_NKEY];
 static uint8_t pad_note[16];                                       /* the white key a pad pressed (+1) */
 static uint8_t enc_last[SMK_NENC], enc_hist[SMK_NENC]; static int16_t enc_cnt[SMK_NENC], enc_steps[SMK_NENC];
-static smk_pad_t pads[16]; static smk_fad_t fads[4];
+static smk_pad_t pads[16] BOOTBSS; static smk_fad_t fads[4] BOOTBSS;
 static volatile uint16_t wheel_raw[2], pedal_raw, batt_raw; static volatile uint32_t pedal_n;
 static uint32_t adc_ok, adc_miss;
 static volatile uint8_t vel_mode;
@@ -65,7 +67,7 @@ static uint32_t shift_word;                                        /* (the DMA r
 #define NSLOT (7u * SWEEP)
 static uint8_t sched[NSLOT], slot, adc_slot = 0xFF;
 
-static void sched_init(void)
+XT static void sched_init(void)
 {
     static const uint8_t OTHER[7] = { 0, 1, 2, 3, 5, 6, 7 };
     uint32_t n = 0;
@@ -129,8 +131,13 @@ static void key_event(uint32_t k, uint32_t vel)    /* keybed key 0..36, vel 0 = 
         notes_now();
     } else extq_put(k, vel);
 }
+static volatile uint8_t pad_drums;                 /* (smk_pad_mode) the pads to the queue as 0x40 + pad */
+static uint16_t pad_down;                           /* pads held (any mode) */
 static void pad_event(uint32_t p, int vel)         /* hardware pad p: a hit (1..127) or let go (-1) */
 {
+    if (vel > 0) pad_down |= (uint16_t)(1u << p); else pad_down &= (uint16_t)~(1u << p);
+    if (vel > 0 && pad_drums) { pad_note[p] = 0x80u; extq_put(0x40u + p, (uint32_t)smk_vel_apply(vel_mode, vel)); return; }
+    if (vel < 0 && pad_note[p] == 0x80u) { pad_note[p] = 0; extq_put(0x40u + p, 0); return; }   /* (its release goes where its hit went) */
     if (vel > 0) {
         uint32_t n = WHITE_NOTE[p];
         key_vel[n] = (uint8_t)smk_vel_apply(vel_mode, vel);
@@ -245,7 +252,7 @@ static int step(void)
     return done;
 }
 
-void panel_init(void)
+XT void panel_init(void)
 {
     smk_trim_defaults(&trim);
     sched_init();
@@ -264,9 +271,9 @@ void panel_init(void)
     for (int f = 0; f < 4; f++) smk_fad_init(&fads[f]);
     col = 0; shift(0);
 }
-int smk_trim_read(void)
+XT int smk_trim_read(void)
 {
-    static uint8_t rec[SMK_TRIM_LEN + 4] __attribute__((aligned(4)));
+    static uint8_t rec[SMK_TRIM_LEN + 4] __attribute__((aligned(4))) BOOTBSS;   /* (read into before it is looked at) */
     if (flash_read(SMK_TRIM_AT, rec, (SMK_TRIM_LEN + 3u) & ~3u)) return 0;
     smk_trim t; smk_trim_defaults(&t);
     if (!smk_trim_load(&t, rec)) return 0;
@@ -331,7 +338,7 @@ int panel_enc_take(int e) { return e >= 0 && e < 7 ? enc_take(FM1_ENC[e]) : 0; }
 int panel_raw_enc_take(int e) { return panel_enc_take(e); }
 int smk_enc_take(int k) { return k >= 0 && k < SMK_NENC ? enc_take(k) : 0; }
 /* the FM-1's calibration (the matrix wired otherwise on some FM-1s) has no use here: only "as built" is taken */
-int panel_map(const uint8_t btn[14], const uint8_t enc[7], const int8_t dir[7])
+XT int panel_map(const uint8_t btn[14], const uint8_t enc[7], const int8_t dir[7])
 {
     for (int i = 0; i < 14; i++) if (btn[i] != i) return -1;
     for (int i = 0; i < 7; i++) if (enc[i] != i || dir[i] != 1) return -1;
@@ -340,32 +347,33 @@ int panel_map(const uint8_t btn[14], const uint8_t enc[7], const int8_t dir[7])
 
 /* ---- the lights: ids 0..13 the buttons, 14 + k the note keys (the white ones are the pads) */
 static volatile uint8_t pads_dirty = 1;
-static void set_level(int id, uint8_t full, uint8_t soft)
+XT static void set_level(int id, uint8_t full, uint8_t soft)
 {
     if (id < 0 || id >= 14 + 27) return;
     if (led_full[id] != full || led_soft[id] != soft) { led_full[id] = full; led_soft[id] = soft; if (id >= 14) pads_dirty = 1; }
 }
-void panel_led(int id, int on) { if (id >= 0 && id < 41) set_level(id, (uint8_t)(on != 0), led_soft[id]); }
-void panel_glow(int id) { if (id >= 0 && id < 41 && !led_soft[id]) set_level(id, led_full[id], 1); }
-void panel_glow_clear(void) { for (int i = 0; i < 41; i++) set_level(i, led_full[i], 0); }
-void panel_level(int id, int lvl)
+XT void panel_led(int id, int on) { if (id >= 0 && id < 41) set_level(id, (uint8_t)(on != 0), led_soft[id]); }
+XT void panel_glow(int id) { if (id >= 0 && id < 41 && !led_soft[id]) set_level(id, led_full[id], 1); }
+XT void panel_glow_clear(void) { for (int i = 0; i < 41; i++) set_level(i, led_full[i], 0); }
+XT void panel_level(int id, int lvl)
 {
     if (id < 0 || id >= 41) return;
     set_level(id, (uint8_t)(lvl >= 4), (uint8_t)(lvl > 0 && lvl < 4 ? lvl : 0));
 }
-void smk_xled(int sb, int on) { if (sb >= 0 && sb < SMK_NLED) xled[sb] = (uint8_t)(on != 0); }
+XT void smk_xled(int sb, int on) { if (sb >= 0 && sb < SMK_NLED) xled[sb] = (uint8_t)(on != 0); }
 
 /* ---- the pads' colours: a frame of 36 latch bytes and 16 x 24 bit bytes, sent by board.c */
 static uint32_t tint = 0xFFA040u, own[16], dimlvl;
-static uint8_t frame_buf[SMK_PADLED_LATCH + 16 * 24] __attribute__((aligned(4)));
+static uint8_t frame_buf[SMK_PADLED_LATCH + 16 * 24] __attribute__((aligned(4))) BOOTBSS;
 int lcd_pads_send(const uint8_t *frame, uint32_t n);                 /* board.c: 0 sent, -1 the bus busy */
-void smk_pad_tint(uint32_t rgb) { if (rgb != tint) { tint = rgb; pads_dirty = 1; } }
-void smk_pad_color(int p, uint32_t rgb) { if (p >= 0 && p < 16 && own[p] != rgb) { own[p] = rgb; pads_dirty = 1; } }
-void smk_pad_dim(int l) { uint32_t d = l < 0 ? 0u : l > 2 ? 2u : (uint32_t)l; if (d != dimlvl) { dimlvl = d; pads_dirty = 1; } }
-void smk_pads_flush(void)
+XT void smk_pad_tint(uint32_t rgb) { if (rgb != tint) { tint = rgb; pads_dirty = 1; } }
+XT void smk_pad_color(int p, uint32_t rgb) { if (p >= 0 && p < 16 && own[p] != rgb) { own[p] = rgb; pads_dirty = 1; } }
+XT void smk_pad_dim(int l) { uint32_t d = l < 0 ? 0u : l > 2 ? 2u : (uint32_t)l; if (d != dimlvl) { dimlvl = d; pads_dirty = 1; } }
+XT void smk_pads_flush(void)
 {
     static const uint8_t SCALE[5] = { 0, 14, 48, 128, 255 };        /* a level's share of the full colour (/255) */
     if (!pads_dirty) return;
+    for (uint32_t i = 0; i < SMK_PADLED_LATCH; i++) frame_buf[i] = 0;   /* (.bootbss: the latch's zeros, every frame) */
     for (int p = 0; p < 16; p++) {
         int id = 14 + WHITE_NOTE[p];
         uint32_t lvl = led_full[id] ? 4u : led_soft[id], c = own[p] ? own[p] : tint, g = 0;
@@ -383,19 +391,21 @@ void smk_pads_flush(void)
 }
 
 /* ---- the extras */
+XT void smk_pad_mode(int drums) { pad_drums = (uint8_t)(drums != 0); }
+int smk_pad_held(int p) { return p >= 0 && p < 16 && ((pad_down >> p) & 1u); }
 int smk_key_vel(int k) { return k >= 0 && k < 27 && key_vel[k] ? key_vel[k] : 100; }
-void smk_vel_mode(int m) { vel_mode = (uint8_t)(m >= 0 && m < KV_N ? m : 0); }
+XT void smk_vel_mode(int m) { vel_mode = (uint8_t)(m >= 0 && m < KV_N ? m : 0); }
 int smk_ext_take(void)
 {
     if (extq_r == extq_w) return -1;
     int v = extq[extq_r]; extq_r = (uint8_t)((extq_r + 1u) & 31u);
     return v;
 }
-int smk_fader(int i) { return i >= 0 && i < 4 ? fads[i].v : -1; }
+XT int smk_fader(int i) { return i >= 0 && i < 4 ? fads[i].v : -1; }
 static smk_pw_t pw; static smk_mw_t mw;
 float smk_bend(void) { uint32_t r = wheel_raw[0]; return r ? smk_pw_bend(&pw, (int32_t)r, time_ticks() / (1000u * time_mhz())) : 0.0f; }
 float smk_mod(void) { uint32_t r = wheel_raw[1]; return r ? smk_mw_val(&mw, (int32_t)r) : 0.0f; }
-int smk_pedal_take(void)
+XT int smk_pedal_take(void)
 {
     static smk_ped_t ped; static uint32_t seen;
     uint32_t n = pedal_n;
@@ -404,4 +414,4 @@ int smk_pedal_take(void)
     return smk_ped_sample(&ped, pedal_raw, time_ticks() / (1000u * time_mhz()));
 }
 int smk_batt_raw(void) { return batt_raw; }
-void smk_stats(uint32_t *f, uint32_t *ok, uint32_t *miss) { *f = frames; *ok = adc_ok; *miss = adc_miss; }
+XT void smk_stats(uint32_t *f, uint32_t *ok, uint32_t *miss) { *f = frames; *ok = adc_ok; *miss = adc_miss; }

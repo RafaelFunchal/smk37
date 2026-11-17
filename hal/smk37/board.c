@@ -86,8 +86,8 @@ int lcd_tile_busy(void)
     tile_on = 0;
     return 0;
 }
-static void lcd_cmd_data(uint8_t c, const uint8_t *d, int n) { lcd_cmd(c); if (n) lcd_data(d, n); }
-void lcd_init(void)
+__attribute__((section(".xtext.smkboard"))) static void lcd_cmd_data(uint8_t c, const uint8_t *d, int n) { lcd_cmd(c); if (n) lcd_data(d, n); }
+__attribute__((section(".xtext.smkboard"))) void lcd_init(void)
 {
     pin_out(LCD_CS, 1); pin_out(LCD_DC, 0); pin_out(SMK_LCD_CLK, 0); pin_out(SMK_LCD_MOSI, 0);
     pin_out(SMK_PADLED_PIN, 0);                                    /* the pads' line idles low (their latch) */
@@ -123,8 +123,8 @@ int lcd_pads_send(const uint8_t *frame, uint32_t n)
 }
 
 /* our own 5 x 7 font: seven rows of five bits, the leftmost pixel in bit 4 */
-static const char FONT_CH[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ .:-+/%=x()<>";
-static const uint8_t FONT[][7] = {
+__attribute__((section(".xtext.smkfont"))) static const char FONT_CH[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ .:-+/%=x()<>";
+__attribute__((section(".xtext.smkfont"))) static const uint8_t FONT[][7] = {
     {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},{14,17,1,2,4,8,31},{30,1,1,14,1,1,30},{2,6,10,18,31,2,2},
     {31,16,30,1,1,17,14},{6,8,16,30,17,17,14},{31,1,2,4,8,8,8},{14,17,17,14,17,17,14},{14,17,17,15,1,2,12},
     {14,17,17,31,17,17,17},{30,17,17,30,17,17,30},{14,17,16,16,16,17,14},{28,18,17,17,17,18,28},{31,16,16,30,16,16,31},
@@ -138,7 +138,7 @@ static const uint8_t FONT[][7] = {
 };
 static uint16_t cell[18 * 24];
 /* one character at pixel (x, y), the 5 x 7 font scaled by 2 (a 12 x 16 cell) or 3 (18 x 24): one window, one DMA */
-void lcd_char(int x, int y, char c, uint16_t fg, uint16_t bg, int scale)
+__attribute__((section(".xtext.smkboard"))) void lcd_char(int x, int y, char c, uint16_t fg, uint16_t bg, int scale)
 {
     uint16_t f = (uint16_t)((fg >> 8) | (fg << 8)), b = (uint16_t)((bg >> 8) | (bg << 8));
     int w = 6 * scale, h = 8 * scale;
@@ -153,7 +153,7 @@ void lcd_char(int x, int y, char c, uint16_t fg, uint16_t bg, int scale)
     lcd_window(x, y, w, h);
     lcd_dma(cell, (uint32_t)(w * h * 2));
 }
-void lcd_text(int col, int row, const char *s, uint16_t fg, uint16_t bg)
+__attribute__((section(".xtext.smkboard"))) void lcd_text(int col, int row, const char *s, uint16_t fg, uint16_t bg)
 {
     for (; *s && col < 20; s++, col++) lcd_char(col * 12, row * 16, *s, fg, bg, 2);
 }

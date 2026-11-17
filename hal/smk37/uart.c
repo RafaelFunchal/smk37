@@ -13,7 +13,7 @@
 #define UM_IOMAP3   REG32(0x51028u)          /* bit 7 clear; bits 23..20 = 1: UART1 TX on an output channel */
 
 #define QN 256u
-static uint8_t q[QN]; static uint32_t qr, qw; static uint8_t open_, busy;
+static uint8_t q[QN] __attribute__((section(".lowbss.smk")));   /* (written before read) */ static uint32_t qr, qw; static uint8_t open_, busy;
 
 void trs_midi_open(void)
 {

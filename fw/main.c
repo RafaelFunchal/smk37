@@ -42,6 +42,9 @@
  * channel, the controllers, the clock in and out; USB audio out (the FM-1 as a sound card); the web editor (app/edproto.h).
  * At power-on: OCT- held, RESCUE (PLAY an empty project, REC the chip's download mode); OCT- and OCT+, the calibration;
  * PLAY, m-bootloader's menu (its MIDI MODE: the installer). The firmware never returns. */
+#ifndef BOARD_SMK37
+#define BOARD_SMK37 0                      /* the FM-1 (fw/build.sh BOARD=smk37: 1) */
+#endif
 #include "../hal/fm1/fm1.h"
 #include "../hal/fm1/board.h"
 #include "../hal/fm1/audio.h"
@@ -73,6 +76,22 @@
 #include "../hal/fm1/usb.h"
 #include "../hal/fm1/uart.h"
 #include "../hal/fm1/irq.h"
+#if BOARD_SMK37
+#include "../hal/smk37/smk37.h"
+#include "../hal/smk37/smk_ctl.h"
+#include "../hal/smk37/smk_panel.h"
+#include "../engine/piano.h"
+#define SMK_LOWBSS __attribute__((section(".lowbss.smk")))   /* (the SMK-37: written before read, to make room) */
+#define PANEL_KEYS 37                           /* the SMK-37's keys: the FM-1's 27, then the outer ten (fw/smk.inc) */
+#define SL_READ smk_no_read                 /* SLOOP 2.8's data is the FM-1's: none here (its places hold the piano) */
+static int smk_no_read(uint32_t a, void *d, uint32_t n) { (void)a; (void)d; (void)n; return -1; }
+static void smk_release(int k);           /* (fw/smk.inc, included before the timer's tick) */
+static uint64_t smk_sus_keys;
+#else
+#define SMK_LOWBSS
+#define PANEL_KEYS 27
+#define SL_READ flash_read
+#endif
 
 #define VERSION "3.3.7"
 /* COLD: a function of the interface, run from the flash window (fw/ram.ld .xtext); never called while the window is
@@ -345,6 +364,9 @@ static int out_seq;                          /* (set while the rolls play: their
 static uint32_t midi_n;                      /* the messages come so far, USB and TRS (the screen) */
 static void midi_out(uint8_t a, uint8_t b, uint8_t c, int n)
 {
+#if BOARD_SMK37
+    { uint8_t t[3] = { a, b, c }; trs_midi_send(t, n); }       /* the TRS jack: MIDI OUT */
+#endif
     if (!usb_midi_ready()) return;
     uint8_t m[3] = { a, b, c }, pk[4];
     midi_usb_packet(m, n, pk); usb_midi_put(pk);
@@ -815,7 +837,7 @@ COLD static uint32_t stack_used_pct(void)
     return (uint32_t)((uintptr_t)__stack_top - (uintptr_t)w) * 100u / (uint32_t)((uintptr_t)__stack_top - (uintptr_t)__stack_low);
 }
 
-static uint8_t key_nn[27];                  /* (each key's notes sounding: the panel's part, below) */
+static uint8_t key_nn[PANEL_KEYS];              /* (each key's notes sounding: the panel's part, below) */
 /* ---------------------------------------------------------------- the screen: the view */
 static uint32_t load_avg, load_peak, load_max, late;   /* load_max: the worst since power-on */
 COLD static void knob(ui_view *v, int i, const char *label, const char *val, int bar, int hot)
@@ -1817,10 +1839,10 @@ COLD static void proj_feed(void)
 
 /* ---------------------------------------------------------------- the panel */
 /* each key's notes sounding (a chord: up to 5), its track; the last chord each track played (what a step writes) */
-static uint8_t key_notes[27][5], key_nn[27], key_vel[27];
-static int8_t key_trk[27];
+static uint8_t key_notes[PANEL_KEYS][5], key_nn[PANEL_KEYS], key_vel[PANEL_KEYS];
+static int8_t key_trk[PANEL_KEYS];
 static uint8_t last_chord[NTRK][5], last_chord_n[NTRK] = { 1, 1, 1, 1, 1 };
-static struct { uint8_t on; uint32_t next; } roll[27];      /* ARP + a key: it repeats on the grid */
+static struct { uint8_t on; uint32_t next; } roll[PANEL_KEYS];      /* ARP + a key: it repeats on the grid */
 /* the free take (REC on an empty project, then play freely): the notes as played, in microseconds from the first;
  * REC on the "1" after the last bar closes it: 1, 2 or 4 bars at the tempo nearest the one set (kept within 3 %) */
 #define FT_MAX 256
@@ -1971,7 +1993,7 @@ static void key_on(int k, int t, const uint8_t *n, int nn, float vel, uint32_t l
     key_trk[k] = (int8_t)t; key_nn[k] = (uint8_t)nn; key_vel[k] = (uint8_t)(vel * 127.0f);
     if (arp_on(t)) { for (int i = 0; i < nn; i++) { key_notes[k][i] = n[i]; arp_add(t, n[i], key_vel[k]); } return; }   /* the arp plays them */
     if (kh_n) {                                               /* KBD HOLD: a note with no key down: the kept ones end */
-        int down = 0; for (int j = 0; j < 27; j++) if (j != k && key_nn[j] && key_trk[j] == t) down = 1;
+        int down = 0; for (int j = 0; j < PANEL_KEYS; j++) if (j != k && key_nn[j] && key_trk[j] == t) down = 1;
         if (!down || kh_trk != t || !kbd_hold(t)) kh_release();
         else for (int i = 0; i < nn; i++) for (int j = 0; j < kh_n; j++) if (kh_note[j] == n[i]) { kh_note[j] = kh_note[--kh_n]; break; }   /* (played again: its key's now) */
     }
@@ -2040,7 +2062,7 @@ static uint16_t sus_on;                             /* the channels whose sustai
 static uint8_t ext_start;                           /* START came: the sequencer starts on the next pulse */
 static midi_parser mp_usb, mp_trs;
 /* ---------------------------------------------------------------- the web editor (app/edproto.h) */
-static uint8_t ed_rx[600];                                  /* a SysEx from USB, whole */
+static uint8_t ed_rx[600] SMK_LOWBSS;                                  /* a SysEx from USB, whole */
 static uint8_t ed_raw[620];                                 /* a request unpacked, then its answer's bytes */
 static uint8_t ed_tx[1400]; static uint32_t ed_tx_n, ed_tx_at;   /* the answers going out (a frame at a time) */
 static struct { uint8_t on, kind, slot, fill; uint32_t total, got, st_n[2]; } ed_wr;   /* a file coming in (into sbuf; 3.3.5: a project
@@ -2079,7 +2101,11 @@ static const gb_pd *ed_pd(int e, int k) { static const gb_pd none = { 0, 0, 0 };
 COLD static void ed_request(void);
 COLD static int us_bank(void);
 /* a user sample slot written from the editor (SLOOP's "FSMP" layout, where SLOOP keeps it: SLOOP 2.8 reads it too) */
+#if BOARD_SMK37
+static const uint32_t SLOT_AT[SMP_NUSR] = { SMK_SLOT_AT, 0, 0, 0 };   /* (one slot: the flash holds the piano) */
+#else
 static const uint32_t SLOT_AT[SMP_NUSR] = { 0xA0000u, 0xB4000u, 0xC8000u, 0xE7000u };
+#endif
 static struct { uint8_t on, k, cur, phase, buf, flushing; uint32_t got, crc, half; } ed_sm;   /* phase: 1 END's last data, 2 its header */
 static uint8_t ed_rep[24]; static uint32_t ed_rep_n; static int ed_rep_cmd;   /* the answer sent once the flash is done */
 static struct { uint8_t on, which, phase; uint32_t total, got; } ed_bk;   /* an FM6 bank or SYN kits image being written (phase 1: its sector) */
@@ -2579,6 +2605,9 @@ COLD static void ed_request(void)
             ed_send(cmd, 3 + 11 * SMP_NUSR); return;
         }
         if (k >= SMP_NUSR || !flash_ok) { ed_err(ED_ERR_BAD); return; }
+#if BOARD_SMK37
+        if (!SLOT_AT[k]) { ed_err(ED_ERR_BAD); return; }   /* (the SMK-37: USR1 only) */
+#endif
         if (saving || ed_bk.on || ed_bk.phase || ed_wr.on) { ed_err(ED_ERR_BUSY); return; }
         ed_rep[0] = (uint8_t)sub; ed_rep[1] = (uint8_t)k; ed_rep_n = 2; ed_rep_cmd = cmd;
         if (sub == 1 || sub == 4) {                           /* BEGIN, ERASE: the slot out, its header's sector erased */
@@ -2822,6 +2851,9 @@ COLD static int plus_held(void)                                    /* CHORD+: th
 }
 COLD static int notes_for_key(int k, uint8_t *out)                 /* what a key plays on the current track */
 {
+#if BOARD_SMK37
+    if (k >= 32) k -= 37;                                       /* (slots 32..36: C3..E3, below F3) */
+#endif
     if (is_drum(trk)) { out[0] = (uint8_t)drum_note_of_key(k); return 1; }
     if (is_slice(trk)) { int n = 60 + k + 12 * oct; out[0] = (uint8_t)(n < 0 ? 0 : n > 127 ? 127 : n); return 1; }   /* (a slice a key: no scale, no chord) */
     int nn = harm_notes(&harm[trk], k, oct, harm[trk].chord != CH_OFF ? plus_held() : 0, out);
@@ -2999,7 +3031,12 @@ COLD static void keys(void)
             for (int j = 0; j < 27; j++) if (still & (1u << j)) { punch_key = j; break; }
             snd_punch(&S, punch_key >= 0 ? punch_of_key(punch_key) : -1);
         }
+#if BOARD_SMK37
+        if (rel & (1u << k)) smk_release(k);                 /* (the sustain pedal may keep it: fw/smk.inc) */
+        if (pr & (1u << k)) smk_sus_keys &= ~(1ull << k);
+#else
         if (rel & (1u << k)) { roll[k].on = 0; key_off(k, latency_frames()); }
+#endif
         /* CHORD+: a black key pressed or let go changes the chords held, under the fingers */
         if (((pr | rel) & (1u << k)) && harm_plus_of_key(k) && !is_drum(trk) && harm[trk].chord != CH_OFF && !(L & ~(1u << BTN_ARP))) {
             for (int j = 0; j < 27; j++) if (key_nn[j] && key_trk[j] == trk && white_of[j] >= 0) {
@@ -3132,7 +3169,11 @@ COLD static void keys(void)
         }
         for (int i = 0; i < nn; i++) last_chord[trk][i] = nts[i];
         last_chord_n[trk] = (uint8_t)nn; last_note = nts[0];
+#if BOARD_SMK37
+        float vel = (float)smk_key_vel(k) * (1.0f / 127.0f);   /* the keybed's (or the pad's) velocity */
+#else
         float vel = 0.8f;
+#endif
         if (is_drum(trk)) { if (held_btn & (1u << BTN_OCT_DOWN)) vel = 0.35f; else if (held_btn & (1u << BTN_OCT_UP)) vel = 1.0f; }
         uint32_t lat = latency_frames();
         if (recording_armed && !Q.playing && !countin && !(L & ~(1u << BTN_ARP))) {   /* armed: the first note starts it */
@@ -3954,7 +3995,12 @@ COLD static void encoders(void)
 
 /* the interface's round (the panel read): from the flash window (COLD), never while a save has it off */
 /* the timer's interrupt, 4000 times a second (3.3): a column of the panel each time, the USB port every other */
+#if BOARD_SMK37
+#include "smk.inc"
+static void tick(void) { static uint8_t n; panel_tick(); if (++n >= 5u) { n = 0; usb_tick(); } }   /* (10 kHz: hal/fm1/irq.c) */
+#else
 static void tick(void) { static uint8_t odd; panel_tick(); if ((odd ^= 1u)) usb_tick(); }
+#endif
 static uint32_t t_ui;                       /* the last pass of the panel and the screen (3.3) */
 static uint32_t t_pot, t_stat, t_autosave, ld_sum, ld_halves, ld_peak;
 COLD __attribute__((noinline)) static void ui_round(void)
@@ -3965,6 +4011,9 @@ COLD __attribute__((noinline)) static void ui_round(void)
         splash_on = 0; if (splash_bad) say_bad(splash_say); else if (splash_say) say_imp(splash_say);
     }
     buttons(); sb_tick(); keys(); notes_advance(); erase_pass(); encoders(); leds();
+#if BOARD_SMK37
+    smk_round();
+#endif
     fm6_bank_poll();
     msg_tick();
     {                                               /* the clock in: said when it comes and when it goes */
@@ -4065,17 +4114,20 @@ COLD __attribute__((noinline)) static void boot_flash(void)
     smp_bank_set((const uint8_t *)(uintptr_t)(FLASH_WIN + 0x44000u));   /* the sample bank (flash 0x48000, tools/mkfw.py), checked once */
     BOOT_STEP(8);
     flash_ok = flash_open() == 0;
+#if BOARD_SMK37
+    if (flash_ok) smk_trim_read();                        /* the unit's own key and pad curves (read, never written) */
+#endif
     if (flash_ok) {
         store_init(&SF);
         BOOT_STEP(9);
         {                                                 /* your sounds: ours, else SLOOP 2.8's user presets (once); first (3.1.2):
                                                            * a project's tracks on one of them are known as such when it loads */
             int n = store_sounds_load(sbuf, sizeof sbuf);
-            if (n != US_FILE && (n == US_LEN || n == US_FILE_FV || us_from_sloop(flash_read, sbuf + 4096, sbuf) >= 0)) {   /* (a bank without favourites or theme: SLOOP's, once) */
+            if (n != US_FILE && (n == US_LEN || n == US_FILE_FV || us_from_sloop(SL_READ, sbuf + 4096, sbuf) >= 0)) {   /* (a bank without favourites or theme: SLOOP's, once) */
                 int had = n == US_FILE_FV;
                 us_from_bytes(sbuf, had ? n : US_LEN);        /* (the places used: the favourites check them) */
-                if (!had) sloop_favs(flash_read, sbuf + 8000, us_fav);   /* its favourites */
-                sloop_theme(flash_read, sbuf + 8000, us_theme);         /* its colour theme */
+                if (!had) sloop_favs(SL_READ, sbuf + 8000, us_fav);   /* its favourites */
+                sloop_theme(SL_READ, sbuf + 8000, us_theme);         /* its colour theme */
                 us_fav_put(sbuf);
                 if (!store_sounds_begin(sbuf, US_FILE)) { int r = ram_store_run(); n = r == 2 ? US_FILE : -1; }
             }
@@ -4085,7 +4137,7 @@ COLD __attribute__((noinline)) static void boot_flash(void)
         {   /* SLOOP 2.8's staging area (flash 0xE0000-0xE4FFF: the update loader that installed us, its request): left
              * over, the boot code could run it again one day. Erased when not blank (no data of ours is there) */
             static uint32_t a[2], r[2];
-            if (!flash_read(0xE0000u, a, 8) && !flash_read(0xE4F00u, r, 8) && (a[0] & a[1] & r[0] & r[1]) != 0xFFFFFFFFu)
+            if (!BOARD_SMK37 && !flash_read(0xE0000u, a, 8) && !flash_read(0xE4F00u, r, 8) && (a[0] & a[1] & r[0] & r[1]) != 0xFFFFFFFFu)
                 for (uint32_t s = 0xE4000u + 0x1000u; s > 0xE0000u; s -= 0x1000u) ram_erase(s - 0x1000u);
         }
         BOOT_STEP(10);
@@ -4101,8 +4153,8 @@ COLD __attribute__((noinline)) static void boot_flash(void)
         if (!proj_used && !safe_start) {                  /* SLOOP 2.8's (never written by SLOOP 3): the project */
             uint8_t *b = (uint8_t *)fxmem;                /* (the delay's memory: free until the sound starts) */
             const uint8_t *secs[4]; int have = 0;
-            for (int i = 0; i < 4; i++) { secs[i] = sloop_read(flash_read, 1 + i, b + (uint32_t)i * SLOOP_PROJ_LEN) ? b + (uint32_t)i * SLOOP_PROJ_LEN : 0; have |= secs[i] != 0; }
-            const uint8_t *w = sloop_read(flash_read, 7, b + 4u * SLOOP_PROJ_LEN) ? b + 4u * SLOOP_PROJ_LEN : 0;
+            for (int i = 0; i < 4; i++) { secs[i] = sloop_read(SL_READ, 1 + i, b + (uint32_t)i * SLOOP_PROJ_LEN) ? b + (uint32_t)i * SLOOP_PROJ_LEN : 0; have |= secs[i] != 0; }
+            const uint8_t *w = sloop_read(SL_READ, 7, b + 4u * SLOOP_PROJ_LEN) ? b + 4u * SLOOP_PROJ_LEN : 0;
             if (have || w) {
                 project_extra x; memset(&x, 0, sizeof x);
                 new_project(0);
@@ -4129,7 +4181,7 @@ COLD __attribute__((noinline)) static void boot_flash(void)
                         ps_give(&PS, t, Q.t[t].cur, &k->patch, base[t], &preset_of[t]); PS.cur[t] = (uint8_t)Q.t[t].cur;
                     }
                     {                                             /* its song, over the sections */
-                        int sn = sloop_obj(flash_read, 0, sbuf, 3840u);
+                        int sn = sloop_obj(SL_READ, 0, sbuf, 3840u);
                         if (sn > 0) sloop_song(sbuf, sn, secs, &Q);
                     }
                     if (save_now() == 2) boot_msg = "SLOOP 2.8 IMPORTED";
@@ -4141,15 +4193,21 @@ COLD __attribute__((noinline)) static void boot_flash(void)
         if (!safe_start && proj_used) load_project(0);
         if (safe_start && proj_used) safe_hold = 1;       /* (the empty project never over yours: saved only when asked twice, HOME) */
         BOOT_STEP(12);
+#if BOARD_SMK37
+        flash_plain_from(SMK_PLAIN_FROM);                 /* the piano, the slot, the banks: in clear through the window */
+        piano_bank_set((const uint8_t *)(uintptr_t)(FLASH_WIN + SMK_PIANO_AT - 0x4000u));
+        smp_user_scan(0, (const uint8_t *)(uintptr_t)(FLASH_WIN + SMK_SLOT_AT - 0x4000u));
+#else
         flash_plain_from(0x93000u);                       /* SLOOP's data, in clear through the window: its user slots */
         for (int k = 0; k < SMP_NUSR; k++) {
             static const uint32_t AT[SMP_NUSR] = { 0xA0000u, 0xB4000u, 0xC8000u, 0xE7000u };
             smp_user_scan(k, (const uint8_t *)(uintptr_t)(FLASH_WIN + AT[k] - 0x4000u));
         }
+#endif
         slice_scan_all();                                 /* (SLICE's tables: BREAK, the user slots; before the sound) */
         BOOT_STEP(13);
         {                                                 /* SYN1..SYN4: SLOOP's (else as SLOOP starts them); its MIDI */
-            int n = sloop_obj(flash_read, 0, sbuf, 3840u);
+            int n = sloop_obj(SL_READ, 0, sbuf, 3840u);
             if (n > 0 && sloop_synkits(sbuf, n, gb_dsyn, gb_dsyn_crush)) syn_src = 1;
             sloop_mset ms;
             if (n > 0 && !home_had) {                     /* (none of ours yet: its MIDI LEARN and MIDI settings) */
@@ -4158,7 +4216,7 @@ COLD __attribute__((noinline)) static void boot_flash(void)
             }
         }
         {                                                 /* SLOOP's FM6 bank (B1..B27): where it is, which slots hold one */
-            int n = sloop_obj(flash_read, 8, sbuf, 3840u);
+            int n = sloop_obj(SL_READ, 8, sbuf, 3840u);
             const uint8_t *b = sbuf;
             if (n == 3472 && b[0] == 'F' && b[1] == 'M' && b[2] == '6' && b[3] == 'B' && (b[4] | b[5] << 8) == 1 && (b[6] | b[7] << 8) == 27) {
                 fm6_bank_at = sloop_obj_at + 16u; fm6_bank_used = (uint32_t)b[8] | (uint32_t)b[9] << 8 | (uint32_t)b[10] << 16 | (uint32_t)b[11] << 24;
@@ -4176,7 +4234,7 @@ COLD __attribute__((noinline)) static void boot_flash(void)
         BOOT_STEP(14);
         BOOT_STEP(15);
         sloop_set ss;                                     /* none of ours yet: SLOOP 2.8's menu and calibration */
-        if (!home_had && sloop_settings(flash_read, sbuf, &ss)) {
+        if (!home_had && sloop_settings(SL_READ, sbuf, &ss)) {
             hs[HS_LOWCUT] = ss.lowcut; hs[HS_LIGHTS] = ss.lights; hs[HS_KEYS] = ss.keys; hs[HS_NOTES] = ss.notes;
             hs[HS_USB] = ss.usb_full; hs[HS_RATE] = ss.usb_rate; hs[HS_CORE2] = ss.core2; hs[HS_ACCEL] = ss.accel;
             if (ss.theme_on && theme_ok()) scr_color = UI_NTHEMES; else if (ss.palette) scr_color = (uint8_t)(1 + ss.palette);   /* (its COLOR, if not the first) */
@@ -4256,7 +4314,7 @@ COLD __attribute__((noinline)) static void start(uint32_t arg)
     usb_midi_open();                                      /* (25 ms: before the sound) */
     trs_midi_open();
     splash_bad = (uint8_t)(!two || crash_msg[0]); splash_say = !two ? "CORE 2: SILENT" : crash_msg[0] ? crash_msg : safe_start ? "SAFE START: AN EMPTY PROJECT" : boot_msg;   /* (3.3: no popup with the name and version) */
-    if ((panel_raw_buttons() & 3u) == 3u) { cal_start(); if (splash_bad) say_bad(splash_say); }   /* OCT- and OCT+ held: the calibration, as on SLOOP */
+    if (!BOARD_SMK37 && (panel_raw_buttons() & 3u) == 3u) { cal_start(); if (splash_bad) say_bad(splash_say); }   /* OCT- and OCT+ held: the calibration, as on SLOOP */
     else { splash_on = 1; splash_t0 = time_ticks(); }
     BOOT_STEP(17);
     ui_flush();                                           /* the first screen, whole, before the sound */
@@ -4281,6 +4339,9 @@ int app_main(uint32_t arg)
         if ((uint32_t)(time_ticks() - t_wdt) > 100000u * lsb) { t_wdt = time_ticks(); sys_wdt_feed(); }   /* (every 0.1 s) */
         crumb_at(W_MIDI);
         midi_poll();
+#if BOARD_SMK37
+        trs_midi_pump();
+#endif
         if (audio_half_free()) {
             panel_dark();
             uint32_t t0 = time_ticks();
@@ -4290,6 +4351,9 @@ int app_main(uint32_t arg)
             for (uint32_t b = 0; b < HALF_FRAMES / GB_BLOCK; b++) {
                 if (b) midi_poll();                          /* (the wires read between the blocks too) */
                 blk_t = t0 + b * blk_ticks;
+#if BOARD_SMK37
+                smk_block();                                 /* the wheels: bend and vibrato */
+#endif
                 render_block(h + b * GB_BLOCK * 2u);
             }
             if (audio_playing_half() != pl) late++;

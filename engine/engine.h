@@ -4,6 +4,10 @@
 #include "../core/gb.h"
 #include "drum.h"
 
+#if BOARD_SMK37 && !defined(GB_NVOICE)
+#define GB_NVOICE 24                /* the SMK-37: 24, the RAM's room for its panel and the piano (and the CPU's for the
+                                     * engines it builds smaller, fw/build.sh) */
+#endif
 #ifndef GB_NVOICE
 #define GB_NVOICE 32                /* voices that can sound (phase 0 measures what the FM-1 holds) */
 #endif
@@ -185,7 +189,11 @@ typedef struct {
 extern const gb_engine *const gb_engines[];
 extern const int gb_nengines;
 extern uint32_t gb_blocks;                          /* blocks rendered (sound.c): the engines' own slots age by it */
+#if BOARD_SMK37
+enum { ENG_VA, ENG_DRUM, ENG_FM, ENG_LOFI, ENG_PD, ENG_WHEEL, ENG_NOISE, ENG_VOICE, ENG_TRIO, ENG_PHYS, ENG_FM6, ENG_SAMPLE, ENG_GRAIN, ENG_SLICE, ENG_PIANO, ENG_N };   /* (SMK-37: the piano bank) */
+#else
 enum { ENG_VA, ENG_DRUM, ENG_FM, ENG_LOFI, ENG_PD, ENG_WHEEL, ENG_NOISE, ENG_VOICE, ENG_TRIO, ENG_PHYS, ENG_FM6, ENG_SAMPLE, ENG_GRAIN, ENG_SLICE, ENG_N };
+#endif
 #define ENG_ANALOG ENG_VA
 #define ENG_DIGITAL ENG_FM
 #define ENG_PHASE ENG_PD

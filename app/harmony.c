@@ -23,6 +23,10 @@ static int degree(int scale, int base, int d)            /* the scale's d-th not
 }
 static int white_index(int key)                           /* 0..15, or -1 for a black key */
 {
+#if BOARD_SMK37                                           /* (the SMK-37's keys below F3: -5..-1, white -3..-1) */
+    if (key < 0) { int pc = (53 + key) % 12, w = 0; if (pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10) return -1;
+                   for (int k = key; k < 0; k++) { int p = (53 + k + 120) % 12; if (!(p == 1 || p == 3 || p == 6 || p == 8 || p == 10)) w--; } return w; }
+#endif
     int pc = (53 + key) % 12, w = 0;
     if (pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10) return -1;
     for (int k = 0; k < key; k++) { int p = (53 + k) % 12; if (!(p == 1 || p == 3 || p == 6 || p == 8 || p == 10)) w++; }

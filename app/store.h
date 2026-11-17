@@ -11,7 +11,11 @@
 #pragma once
 #include <stdint.h>
 
+#if BOARD_SMK37                                  /* the SMK-37: above the calibration, out of an install's reach (hal/smk37/smk37.h) */
+#define STORE_BASE 0xD8000u
+#else
 #define STORE_BASE 0x7A000u
+#endif
 #define STORE_APP_MAX (0x48000u - 0x4000u)       /* the firmware must end below the sample bank (3.3.1: 0x48000; 0x4B778 from 3.1.6) */
 #define STORE_SLOTS 8
 #define STORE_AREAS 9
@@ -53,7 +57,11 @@ int store_raw_begin(uint32_t sector, uint32_t off, const void *data, uint32_t n,
 uint32_t store_progress(void);                   /* 0..100 */
 uint32_t crc32_ieee(uint32_t crc, const void *d, uint32_t n);
 /* the user sounds (usersnd.c): two copies of a sector at 0x95000 and 0x96000, saved as a project is (store_step) */
+#if BOARD_SMK37
+#define STORE_SOUNDS_AT 0xF2000u
+#else
 #define STORE_SOUNDS_AT 0x95000u
+#endif
 #define STORE_SOUNDS_SLOT 0x53u
 #define STORE_SOUNDS_MAX (4096u - 256u)
 int store_sounds_load(void *buf, uint32_t cap);     /* its length, or -1 */

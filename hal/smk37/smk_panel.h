@@ -30,6 +30,8 @@ void smk_pad_tint(uint32_t rgb);
 void smk_pad_color(int pad, uint32_t rgb);
 void smk_pad_dim(int lvl);                 /* PAD LIGHTS: 0 full, 1 half, 2 a quarter */
 void smk_pads_flush(void);                 /* (main loop) the pads' frame sent when it changed and the screen's bus is free */
+void smk_pad_mode(int drums);              /* 1: DRUM PADS, a hit goes to smk_ext_take as (0x40 + pad) << 8 | velocity */
+int smk_pad_held(int pad);                 /* pad 0..15 held now */
 /* the factory calibration, read once the flash is open (never written): 1 the unit's curves, 0 the defaults */
 int smk_trim_read(void);
 /* the panel's diagnostics: frames scanned, conversions read / missed */
