@@ -95,7 +95,9 @@ static void smk_keys_init(void);
 static uint32_t smk_as_hits;                      /* (the panel's press count when the last save began: an autosave stops at a press) */
 static int8_t smk_layer, smk_lower, smk_split;  /* (fw/smk.inc: KEYS, kept with the project: proj_extra, home_from) */
 static uint8_t smk_kv, smk_sens, smk_light, smk_krev;   /* (fw/smk.inc: the SMK-37's settings, kept with the project too) */
-static uint8_t smk_drumpads;                       /* (fw/smk.inc: PADS PLAY DRUMS, KNOB BANK's too: kept with the project) */
+static uint8_t smk_pads;                           /* (fw/smk.inc: PADS: 0 CONTROL, 1 DRUMS (KNOB BANK), 2 NOTES; kept with the project) */
+static int8_t smk_layer_park, smk_lower_park, smk_split_park;   /* (fw/smk.inc: the layer and split turned off, kept for LAYER, SPLIT) */
+static uint8_t smk_stay;                           /* (fw/smk.inc: the pads' LEFT, RIGHT: choose_preset stays on its page) */
 static void smk_settings_apply(void);
 static void smk_view(ui_view *v, int pg);
 static void smk_keys_view(ui_view *v);
@@ -1753,7 +1755,9 @@ COLD static void proj_extra(project_extra *xp)
     x.home[79] = (uint8_t)(smk_split > -100 ? smk_split + 64 : 0);
     /* (and its settings, in the FM-1's calibration bytes, never used on the SMK-37: byte 10 stays 0xFF, not 1) */
     x.home[11] = smk_kv; x.home[12] = smk_sens; x.home[13] = smk_light; x.home[14] = smk_krev; x.home[15] = ui_large;
-    x.home[16] = smk_drumpads;
+    x.home[16] = smk_pads;
+    x.home[17] = (uint8_t)(smk_layer_park + 1); x.home[18] = (uint8_t)(smk_lower_park + 1);   /* (the layer and split parked) */
+    x.home[19] = (uint8_t)(smk_split_park > -100 ? smk_split_park + 64 : 0);
 #endif
     *xp = x;
 }
@@ -1819,7 +1823,10 @@ COLD static void home_from(const uint8_t *h)
         if (h[13] <= 2) smk_light = h[13];
         if (h[14] <= 1) smk_krev = h[14];
         if (h[15] <= 1) ui_large = h[15];
-        if (h[16] <= 1) smk_drumpads = h[16];                 /* (PADS PLAY; older projects: 0xFF, left as it is) */
+        if (h[16] <= 2) smk_pads = h[16];                 /* (PADS; older projects: 0xFF, left as it is) */
+        smk_layer_park = h[17] >= 1 && h[17] <= NTRK ? (int8_t)(h[17] - 1) : -1;
+        smk_lower_park = h[18] >= 1 && h[18] <= NTRK ? (int8_t)(h[18] - 1) : -1;
+        smk_split_park = h[19] >= 64 - 5 && h[19] <= 64 + 31 ? (int8_t)(h[19] - 64) : -100;
     }
     smk_settings_apply();
 #endif
@@ -3655,6 +3662,9 @@ COLD static void choose_preset(int d)
         sb_cat = (uint8_t)c; sb_pg = (uint8_t)(i / 16); sb_trk = (int8_t)trk; sb_t = time_ticks();
         int plain = !L && hold_step < 0 && !Q.recording && !recording_armed && !countin && !ft_on &&
                     sticky != PG_STEPS && sticky != PG_NOTES && sticky != PG_SONG && sticky != PG_SONG2 && sticky != PG_SEL;
+#if BOARD_SMK37
+        if (smk_stay) plain = 0;                           /* (the pads' LEFT and RIGHT: the page stays, the pads with it) */
+#endif
         if (sticky != PG_SND && plain) { sb_back = (int8_t)sticky; sticky = PG_SND; sb_was = 1; }
         if (sticky == PG_SND && !L) { sb_n = (uint8_t)sb_list(sb_cat, sb_pg * 16, sb_o); return; }
         char b[48], *p = put_s(b, sb_cat_name(c)); p = put_s(p, " · "); p = put_s(p, snd_name(o[i & 15]));

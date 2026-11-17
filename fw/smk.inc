@@ -56,10 +56,14 @@ COLD static void smk_play(int k, int t, const uint8_t *n, int nn, float vel)
     }
     if (t == trk) smk_key_on(k, n, nn, vel, lat); else key_on(k, t, n, nn, vel, lat);
 }
+enum { PM_CONTROL, PM_DRUMS, PM_NOTES };                      /* PADS (smk_pads): what the pads do on the playing pages */
+static uint16_t smk_ctl_down;                                   /* (CONTROL: the pads pressed as controls, their release goes there) */
+COLD static int smk_ctl_pad(int pad, int vel);
 COLD static void smk_outer(void)
 {
     for (int e; (e = smk_ext_take()) >= 0;) {
         int kb = e >> 8, vel = e & 255;
+        if (kb >= 0x40 && smk_ctl_pad(kb - 0x40, vel)) continue;   /* PADS: CONTROL (a pad's press and its release) */
         if (kb >= 0x40) {                                       /* DRUM PADS: pad (kb - 0x40) on the drum track */
             int pad = kb - 0x40, t = -1;
             for (int i = 0; i < NTRK; i++) if (is_drum(i)) t = i;
@@ -149,6 +153,7 @@ static void smk_block(void)
 }
 /* ---- KEYS: the layer and the split (KNOB BANK held: K3, K4, a key) */
 static int8_t smk_layer = -1, smk_lower = -1;               /* tracks (-1 none) */
+static int8_t smk_layer_park = -1, smk_lower_park = -1, smk_split_park = -100;   /* (the pads' LAYER, SPLIT: what they turn back on) */
 static int8_t smk_split = -100;                              /* the split point: keys at positions below it play smk_lower */
 static uint8_t smk_kb_used;                                  /* (KNOB BANK held and used: no DRUM PADS on its release) */
 static int8_t smk_lay_trk[PANEL_KEYS] GB_BOOTRAM; static uint8_t smk_lay_n[PANEL_KEYS] GB_BOOTRAM, smk_lay_notes[PANEL_KEYS][5] GB_BOOTRAM;   /* (smk_keys_init) */
@@ -246,8 +251,14 @@ COLD static void smk_pages_next(void)
     vis_on = 0;
 }
 /* SMK-37 SETTINGS: K2 turns between its two pages (as HOME's): 1/2 TOUCH, SENS (the pads'), LIGHT, KNOBS; 2/2 PADS:
- * NOTES or DRUMS (as KNOB BANK tapped) */
-COLD static void smk_drumpads_say(void) { say(smk_drumpads ? "PADS: THE DRUM KIT" : "PADS: THE WHITE KEYS"); }
+ * CONTROL, DRUMS (as KNOB BANK tapped) or NOTES */
+static const char *const SMK_PADS_NAME[3] = { "CONTROL", "DRUMS", "NOTES" };
+static uint8_t smk_pads_back;                                /* (KNOB BANK: the mode DRUMS goes back to) */
+COLD static void smk_pads_say(void)
+{
+    say(smk_pads == PM_DRUMS ? "PADS: THE DRUM KIT" : smk_pads == PM_NOTES ? "PADS: THE WHITE KEYS"
+        : "PADS: CONTROL");                                     /* (a message: 39 bytes at most) */
+}
 COLD static void smk_page_knobs(void)
 {
     static const char *const KN[7] = { "K2", "K3", "K5", "K6", "K7", "K8", "K4" };   /* (the FM-1's ids: fm1.h ENC_*) */
@@ -263,8 +274,9 @@ COLD static void smk_page_knobs(void)
         }
         int s = d > 0 ? 1 : -1;
         if (e == ENC_SELECT) { smk_setpg = (uint8_t)(s > 0); continue; }
-        if (smk_setpg) {                                            /* (2/2: the pads play the notes, or the drum kit) */
-            if (e == ENC_KNOB1 && smk_drumpads != (uint8_t)(s > 0)) { smk_drumpads = (uint8_t)(s > 0); smk_drumpads_say(); }
+        if (smk_setpg) {                                            /* (2/2: the pads' controls, the drum kit, or the notes) */
+            int m = smk_pads + s; m = m < 0 ? 0 : m > PM_NOTES ? PM_NOTES : m;
+            if (e == ENC_KNOB1 && m != smk_pads) { smk_pads = (uint8_t)m; smk_pads_say(); }
             continue;
         }
         if (e == ENC_KNOB1) smk_kv = (uint8_t)(smk_kv + s < 0 ? 0 : smk_kv + s >= KV_N ? KV_N - 1 : smk_kv + s);
@@ -288,7 +300,7 @@ COLD static void smk_view(ui_view *v, int pg)
     if (pg == PG_SMKSET) {
         v->page = UI_GENERIC;
         put_s(v->page_name, smk_setpg ? "SMK-37 2/2 · < >: TEST" : "SMK-37 1/2 · < >: TEST")[0] = 0;
-        if (smk_setpg) { knob(v, 0, "PADS", smk_drumpads ? "DRUMS" : "NOTES", smk_drumpads * 100, 0); return; }
+        if (smk_setpg) { knob(v, 0, "PADS", SMK_PADS_NAME[smk_pads % 3], smk_pads * 50, 0); return; }
         knob(v, 0, "TOUCH", SMK_KV_NAME[smk_kv % KV_N], smk_kv * 20, 0);      /* (the keys' and pads' velocity) */
         knob(v, 1, "SENS", SMK_SENS_NAME[smk_sens & 3], smk_sens * 33, 0);    /* (the pads: how firm a hit must be) */
         knob(v, 2, "LIGHT", SMK_LIGHT_NAME[smk_light % 3], 100 - smk_light * 40, 0);
@@ -332,7 +344,10 @@ COLD static void smk_xbtns(void)
     if (pr & (1u << SB_FADER_BANK)) smk_fader_bank((held_btn & (1u << BTN_OCT_DOWN)) ? -1 : 1);
     if (pr & (1u << SB_KNOB_BANK)) { smk_kb_used = 0; smk_kb_t = time_ticks(); }
     /* (a tap: DRUM PADS on or off, kept with the project; held long enough for the KEYS page, only looked at: nothing) */
-    if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used && (uint32_t)(time_ticks() - smk_kb_t) < 300000u * lsb) { smk_drumpads = (uint8_t)!smk_drumpads; smk_drumpads_say(); }
+    if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used && (uint32_t)(time_ticks() - smk_kb_t) < 300000u * lsb) {
+        if (smk_pads == PM_DRUMS) smk_pads = smk_pads_back; else { smk_pads_back = smk_pads; smk_pads = PM_DRUMS; }   /* (DRUMS, then back) */
+        smk_pads_say();
+    }
     {   /* < and > together: the SMK-37's pages; alone, each acts when let go (the first of a pair does nothing) */
         static uint8_t combo;
         const uint32_t LR = (1u << SB_LEFT) | (1u << SB_RIGHT);
@@ -355,16 +370,145 @@ COLD static void smk_xbtns(void)
 }
 /* ---- the lights: the pads in the track's colour; DRUM PADS in the drums' (lit as they are hit) */
 COLD static uint32_t smk_rgb(uint16_t c) { return (uint32_t)((c >> 11) & 31) * 255u / 31u << 16 | (uint32_t)((c >> 5) & 63) * 255u / 63u << 8 | (uint32_t)(c & 31) * 255u / 31u; }
-COLD static int smk_drum_mode(void) { return smk_drumpads && !lay() && !is_drum(trk) && sticky != PG_STEPS && sticky != PG_SND && !notes_on(); }
+COLD static int smk_drum_mode(void) { return smk_pads == PM_DRUMS && !lay() && !is_drum(trk) && sticky != PG_STEPS && sticky != PG_SND && !notes_on(); }
+/* PADS: CONTROL, on the playing pages (where the pads have no job of their own: not a held button's tiles, SEQ's steps,
+ * SOUNDS, NOTES, the SMK-37's pages). The left eight (top 1-4, bottom 9-12) your sound slots 1-8: a tap loads the
+ * slot's sound on the track, held 2 s it keeps the track's sound there (YOURS 1-8, as EDIT's USER SOUNDS). The top
+ * right four: UP, DOWN (the kind of sound: KEYS, BASS, PAD...), LEFT, RIGHT (a sound back, on); the bottom right four:
+ * SOLO (the track alone, again: all back), LAYER and SPLIT (off, and back as they were), TAP (the tempo) */
+enum { PC_UP = 4, PC_DOWN, PC_LEFT, PC_RIGHT, PC_SOLO = 12, PC_LAYER, PC_SPLIT, PC_TAP };
+COLD static int smk_ctl_mode(void)
+{
+    return smk_pads == PM_CONTROL && !lay() && sticky != PG_STEPS && sticky != PG_SND && !notes_on() && sticky != PG_SMKSET && sticky != PG_SMKTEST;
+}
+COLD static int smk_slot_of(int pad) { return pad < 4 ? pad : pad >= 8 && pad < 12 ? pad - 4 : -1; }   /* (slot 0..7) */
+static uint32_t smk_ctl_t[16]; static uint16_t smk_ctl_fired;   /* (a slot pad: when it went down; held 2 s: saved) */
+COLD static char *smk_put_trk(char *p, int t) { p = put_u(p, (uint32_t)POS[t] + 1u); p = put_s(p, " "); return put_s(p, smk_snd_name(t)); }
+COLD static char *smk_put_note(char *p, int pos) { int n = 53 + pos; p = put_s(p, harm_note_name[n % 12]); return put_u(p, (uint32_t)(n / 12 - 1)); }
+COLD static int smk_other_synth(void)                          /* a synth track other than the one played: -1 none */
+{
+    for (int i = 1, c = -1; i <= NTRK; i++) { c = smk_next_trk(c, 1, 0); if (c >= 0 && c != trk) return c; }
+    return -1;
+}
+COLD static void smk_layer_toggle(void)
+{
+    char b[64], *p;
+    if (smk_layer >= 0) { smk_layer_park = smk_layer; smk_layer = -1; say("LAYER OFF"); return; }
+    int L = smk_layer_park;
+    if (L < 0 || L >= NTRK || is_drum(L) || L == trk) L = smk_other_synth();
+    if (L < 0) { say_bad("LAYER: NO OTHER SYNTH TRACK"); return; }
+    smk_layer = (int8_t)L;
+    p = smk_put_trk(put_s(b, "LAYER ON · "), L); *p = 0; say(b);
+}
+COLD static void smk_split_toggle(void)
+{
+    char b[64], *p;
+    if (smk_split > -100 && smk_lower >= 0) { smk_split_park = smk_split; smk_lower_park = smk_lower; smk_split = -100; say("SPLIT OFF"); return; }
+    int L = smk_lower_park, at = smk_split_park;
+    if (L < 0 || L >= NTRK || L == trk) L = smk_lower >= 0 && smk_lower != trk ? smk_lower : smk_other_synth();
+    if (L < 0) { say_bad("SPLIT: NO OTHER TRACK"); return; }
+    smk_lower = (int8_t)L; smk_split = (int8_t)(at > -100 ? at : 7);    /* (first time: below C4) */
+    p = smk_put_trk(put_s(b, "SPLIT ON · "), L); p = smk_put_note(put_s(p, " BELOW "), smk_split); *p = 0; say(b);
+}
+COLD static void smk_kind_step(int d)                          /* UP, DOWN: the next kind of sound this track has, its first */
+{
+    int c = sb_cat; (void)sb_where(preset_origin(preset_of[trk]), &c);
+    for (int tries = 0; tries < SB_NCAT; tries++) {
+        c = (c + (d > 0 ? 1 : SB_NCAT - 1)) % SB_NCAT;
+        if (!sb_cat_ok(c)) continue;
+        int16_t o[16]; int n = sb_list(c, 0, o), j = 0;
+        while (j < 16 && o[j] < 0) j++;
+        if (n <= 0 || j >= 16 || !snd_load(o[j])) continue;
+        sb_cat = (uint8_t)c; sb_pg = 0; sb_trk = (int8_t)trk; sb_t = time_ticks();
+        char b[64], *p = put_s(b, sb_cat_name(c)); p = put_s(p, " · "); p = put_s(p, snd_name(o[j])); *p = 0; say(b);
+        return;
+    }
+}
+COLD static void smk_slot_tap(int k)
+{
+    char b[64], *p = put_u(put_s(b, "SLOT "), (uint32_t)k + 1u);
+    if (is_drum(trk)) { say_bad("SLOTS: THE SYNTH TRACKS' SOUNDS"); return; }
+    if (!us_used(k)) { p = put_s(p, " EMPTY · HOLD 2 S TO KEEP"); *p = 0; say(b); return; }
+    if (!apply_user(trk, k)) { say_bad(saving ? "SAVING · AGAIN IN A MOMENT" : "USER SOUND UNREADABLE"); return; }
+    p = put_s(put_s(p, " · "), us_name(k)); *p = 0; say_imp(b);
+}
+COLD static void smk_slot_keep(int k)
+{
+    if (is_drum(trk)) { say_bad("SLOTS: THE SYNTH TRACKS' SOUNDS"); return; }
+    if (saving) { say_bad("SAVING · AGAIN IN A MOMENT"); return; }
+    char b[64], *p = put_u(put_s(b, "SLOT "), (uint32_t)k + 1u); p = put_s(p, " · KEEPING "); p = put_s(p, smk_snd_name(trk)); *p = 0;
+    user_save(k, 0);
+    if (saving) say(b);                                        /* ("USER SOUNDS SAVED" once written) */
+}
+/* a pad's press or release from the queue: 1 if it was a control's */
+COLD static int smk_ctl_pad(int pad, int vel)
+{
+    uint16_t bit = (uint16_t)(1u << pad);
+    if (!vel) {                                                /* let go: a slot tapped (not held to keeping) is loaded */
+        if (!(smk_ctl_down & bit)) return 0;
+        smk_ctl_down &= (uint16_t)~bit;
+        int k = smk_slot_of(pad);
+        if (k >= 0 && !(smk_ctl_fired & bit)) smk_slot_tap(k);
+        return 1;
+    }
+    if (!smk_ctl_mode()) return 0;
+    smk_ctl_down |= bit; smk_ctl_fired &= (uint16_t)~bit; smk_ctl_t[pad] = time_ticks(); t_input = smk_ctl_t[pad];
+    if (smk_slot_of(pad) >= 0) return 1;                       /* (its tap or its hold: on release, or after 2 s) */
+    switch (pad) {
+    case PC_UP: smk_kind_step(1); break;
+    case PC_DOWN: smk_kind_step(-1); break;
+    case PC_LEFT: case PC_RIGHT: smk_stay = 1; choose_preset(pad == PC_RIGHT ? 1 : -1); smk_stay = 0; break;
+    case PC_SOLO: {
+        int on = !solo[trk]; for (int t = 0; t < NTRK; t++) solo[t] = 0; solo[trk] = (uint8_t)on;
+        char b[64], *p = put_s(b, on ? "SOLO · " : "SOLO OFF"); if (on) p = smk_put_trk(p, trk); *p = 0; say(b);
+        break; }
+    case PC_LAYER: smk_layer_toggle(); break;
+    case PC_SPLIT: smk_split_toggle(); break;
+    case PC_TAP: tap_tempo(); break;
+    }
+    return 1;
+}
+COLD static void smk_ctl_tick(void)                            /* a slot pad held 2 s: the track's sound kept there */
+{
+    uint32_t now = time_ticks();
+    for (int pad = 0; pad < 16; pad++) {
+        uint16_t bit = (uint16_t)(1u << pad); int k = smk_slot_of(pad);
+        if (k < 0 || !(smk_ctl_down & bit) || (smk_ctl_fired & bit)) continue;
+        if ((uint32_t)(now - smk_ctl_t[pad]) >= 2000000u * lsb) { smk_ctl_fired |= bit; smk_slot_keep(k); }
+    }
+}
+COLD static void smk_ctl_lights(void)
+{
+    uint32_t tc = smk_rgb(TRK_COL[trk]), now = time_ticks();
+    float bpm = Q.bpm > 20.0f ? Q.bpm : 120.0f; uint32_t per = (uint32_t)(60000000.0f / bpm) * lsb;
+    int beat = Q.playing ? (int)(Q.tick % (4u * SEQ_TPS) < SEQ_TPS) : (int)(now % per < per / 4u);
+    int cur = preset_origin(preset_of[trk]);
+    for (int pad = 0; pad < 16; pad++) {
+        int k = smk_slot_of(pad), held = (smk_ctl_down >> pad) & 1u, lvl = 1; uint32_t c = 0xFFFFFFu;
+        if (k >= 0) {
+            int used = us_used(k), mine = cur == US_BASE + k && !is_drum(trk);
+            c = used ? tc : 0x808080u; lvl = mine ? 4 : used ? 2 : 1;
+            if (held) lvl = ((now - smk_ctl_t[pad]) / (120000u * lsb)) & 1u ? 4 : 1;   /* (held: blinks, to keep it) */
+        } else if (pad == PC_SOLO) { c = 0xFFD23Cu; lvl = solo[trk] ? 4 : 1; }
+        else if (pad == PC_LAYER) { int L = smk_layer >= 0 ? smk_layer : smk_layer_park; c = L >= 0 ? smk_rgb(TRK_COL[L]) : 0xFFFFFFu; lvl = smk_layer >= 0 ? 4 : 1; }
+        else if (pad == PC_SPLIT) { int on = smk_split > -100 && smk_lower >= 0, L = on ? smk_lower : smk_lower_park; c = L >= 0 ? smk_rgb(TRK_COL[L]) : 0xFFFFFFu; lvl = on ? 4 : 1; }
+        else if (pad == PC_TAP) lvl = beat ? 4 : 1;
+        else lvl = held ? 4 : 3;                               /* (UP DOWN LEFT RIGHT: brighter than an empty slot) */
+        if (held && k < 0) lvl = 4;
+        smk_pad_color(pad, c);
+        panel_level(14 + white_key[pad], lvl);
+    }
+}
 COLD static void smk_lights(void)
 {
-    int dm = smk_drum_mode(), dt = 0;
+    int dm = smk_drum_mode(), cm = smk_ctl_mode(), dt = 0;
     for (int i = 0; i < NTRK; i++) if (is_drum(i)) dt = i;
-    smk_pad_mode(dm);
+    smk_pad_mode(dm || cm);
     smk_pad_tint(smk_rgb(TRK_COL[dm ? dt : trk]));
+    if (cm) smk_ctl_lights(); else for (int p = 0; p < 16; p++) smk_pad_color(p, 0);   /* (the controls' own colours, gone) */
     if (dm) for (int w = 0; w < 16; w++) panel_level(14 + white_key[w], smk_pad_held(w) ? 4 : 1);
     smk_xled(SB_FADER_BANK, smk_fbank != 0);
-    smk_xled(SB_KNOB_BANK, smk_drumpads);
+    smk_xled(SB_KNOB_BANK, smk_pads == PM_DRUMS);
     smk_xled(SB_LEFT, 0); smk_xled(SB_RIGHT, 0);
     smk_pads_flush();
 }
@@ -383,5 +527,5 @@ COLD static int smk_flash_voices(void)
 /* once a round of the interface (ui_round) */
 COLD static void smk_round(void)
 {
-    smk_xbtns(); smk_outer(); smk_pedal(); smk_faders(); smk_lights();
+    smk_xbtns(); smk_outer(); smk_pedal(); smk_faders(); smk_ctl_tick(); smk_lights();
 }
