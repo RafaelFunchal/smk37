@@ -51,6 +51,7 @@ static void wait_until(uint64_t ns) { if (ns > tw_ns) { tw_wake = ns; tw_give(0)
 
 /* ---- what the firmware said (its messages), its sound */
 static char tw_msgs[8192][40]; static uint32_t tw_nmsg, tw_seen_gen;
+static double tw_jump; static uint32_t tw_clip;   /* (the largest step between two samples; samples at full scale) */
 static double tw_peak, tw_sq; static uint64_t tw_sqn; static int tw_wild; static FILE *tw_wav; static uint32_t tw_wav_n;
 void twin_tick(void)
 {
@@ -79,6 +80,8 @@ void twin_audio(const int32_t *lr, uint32_t frames)
     for (uint32_t i = 0; i < 2 * frames; i++) {
         double a = fabs((double)lr[i]) / 8388608.0;
         if (a > tw_peak) tw_peak = a;
+        { static double prev[2]; double v = (double)lr[i] / 8388608.0, j = fabs(v - prev[i & 1]); prev[i & 1] = v; if (j > tw_jump) tw_jump = j; if (a >= 0.999) tw_clip++;
+        }
         tw_sq += a * a; tw_sqn++;
         if (a > 1.01) tw_wild++;
     }
@@ -2338,12 +2341,79 @@ static void sc_smk_reboot(void)                  /* after sc_smk's flash: the pr
     check_project_roundtrip("SMK-37 after the restart");
 }
 #endif
+/* every factory sound on a synth track at full level: a note, then a chord; its peak, its loudness, its largest step
+ * between two samples (a click), its samples at full scale (TSV on stdout: compare the FM-1's and the SMK-37's) */
+static void sc_sweep(void)
+{
+    boot_wait(); for (int i = 0; i < 400 && splash_on; i++) wait_ms(10);
+    int t = 0; for (int u = 0; u < NTRK; u++) if (!is_drum(u)) { t = u; break; }
+    for (int u = 0; u < NTRK; u++) solo[u] = u == t;
+    select_track(t); trk = t; oct = 0; sm_set(&S.trk[t].level, 1.0f);
+    for (int i = 0; i < gb_npresets; i++) {
+        if (gb_presets[i].kind == K_KIT) continue;
+        apply_preset(t, i); wait_ms(150);
+        tw_peak = 0; tw_sq = 0; tw_sqn = 0; tw_jump = 0; tw_clip = 0;
+        keydown(7); wait_ms(500); keyup(7); wait_ms(250);
+        keydown(7); keydown(11); keydown(14); wait_ms(700); keyup(7); keyup(11); keyup(14); wait_ms(600);
+        double rms = tw_sqn ? sqrt(tw_sq / (double)tw_sqn) : 0;
+        printf("SWEEP\t%s\t%s\t%.4f\t%.5f\t%.4f\t%u\t%.2f\n", gb_presets[i].name, gb_engines[gb_presets[i].engine]->name, tw_peak, rms, tw_jump, tw_clip, rms > 0 ? tw_jump / rms : 0);
+    }
+}
+#if BOARD_SMK37
+/* the PIANO into a WAV, as Erik37's host/render.c is driven (build/ref/events.txt): keys 60..108 at 120, each 2.5 s,
+ * 3 s apart, no sends: the same analysis for both */
+static void sc_pianowav(void)
+{
+    boot_wait(); for (int i = 0; i < 400 && splash_on; i++) wait_ms(10);
+    int t = 0; for (int u = 0; u < NTRK; u++) if (!is_drum(u)) { t = u; break; }
+    for (int u = 0; u < NTRK; u++) solo[u] = u == t;
+    apply_preset(t, preset_named(getenv("TWIN_PRESET") ? getenv("TWIN_PRESET") : "CONCERT"));
+    sm_set(&S.trk[t].level, 1.0f); sm_set(&S.trk[t].send_rev, 0.0f); sm_set(&S.trk[t].send_dly, 0.0f); sm_set(&S.trk[t].send_cho, 0.0f);
+    wait_ms(1500);
+    wav_on("pianowav");
+    for (int n = 60; n <= 108; n++) { play_on(GB_OWNER(OWN_KEY, 0), t, n, 120.0f / 127.0f); wait_ms(2500); play_off(GB_OWNER(OWN_KEY, 0), t, n); wait_ms(500); }
+    tw_wav_close();
+}
+#endif
+#if BOARD_SMK37
+/* a demo to watch (TWIN film, 30 frames a second, and its sound): the CONCERT piano with the pedal, the SMK-37's
+ * SETTINGS and PANEL TEST, TEXT LARGE (tools: build/demo, see host/twin-smk.sh) */
+static void sc_smkdemo(void)
+{
+    boot_wait(); for (int i = 0; i < 400 && splash_on; i++) wait_ms(10);
+    char fn[512];
+    snprintf(fn, sizeof fn, "%s/film.rgb565", tw_out); tw_film = fopen(fn, "wb"); tw_film_t = tw_s();
+    wav_on("film");
+    int t = synth_trk(); select_track(t); trk = t; oct = 0;
+    tap(B_HOME); wait_ms(600);
+    apply_preset(t, preset_named("CONCERT")); say("CONCERT · THE PIANO"); wait_ms(1200);
+    static const int CH[4][4] = { { 7, 11, 14, 19 }, { 4, 7, 11, 16 }, { 0, 4, 7, 12 }, { 2, 6, 9, 14 } };   /* C Am F G (from F3) */
+    for (int r = 0; r < 2; r++) for (int c = 0; c < 4; c++) {
+        tw_pedal(1); wait_ms(20);
+        for (int i = 0; i < 4; i++) { tw_vel[CH[c][i]] = 60 + 15 * i + 10 * r; keydown(CH[c][i]); wait_ms(35); }
+        wait_ms(500); for (int i = 0; i < 4; i++) keyup(CH[c][i]);
+        wait_ms(450); tw_pedal(0); wait_ms(30);
+    }
+    wait_ms(1500);
+    lr_together(); wait_ms(1500);                                    /* SETTINGS */
+    turn(ENC_KNOB2, 1); wait_ms(700); turn(ENC_KNOB2, -1); wait_ms(700);
+    lr_together(); wait_ms(800);                                     /* PANEL TEST */
+    for (int p = 0; p < 16; p += 3) { tw_pad(p, 80 + p); wait_ms(250); tw_pad(p, 0); wait_ms(120); }
+    tap(B_SEQ); wait_ms(500); turn(ENC_KNOB1, 3); wait_ms(800);
+    lr_together(); wait_ms(800);                                     /* back */
+    home_knob(1, 2, 1); wait_ms(1500);                               /* TEXT: LARGE */
+    for (int c = 0; c < 4; c++) { for (int i = 0; i < 3; i++) { tw_vel[CH[c][i]] = 90; keydown(CH[c][i]); } wait_ms(600); for (int i = 0; i < 3; i++) keyup(CH[c][i]); wait_ms(150); }
+    wait_ms(2500);
+    home_knob(1, 2, -1); wait_ms(300);
+    fclose(tw_film); tw_film = 0; tw_wav_close();
+}
+#endif
 static const struct { const char *name; void (*fn)(void); } SC[] = {
     { "boot", sc_boot }, { "reboot", sc_reboot }, { "sounds", sc_sounds }, { "ukit", sc_ukit }, { "pages", sc_pages }, { "record", sc_record },
     { "powercut", sc_powercut }, { "aftercut", sc_after_cut }, { "sample", sc_sample }, { "editor", sc_editor },
-    { "monkey", sc_monkey }, { "import", sc_import }, { "midi", sc_midi }, { "rescue", sc_rescue }, { "calib", sc_calib }, { "settings", sc_settings }, { "play", sc_play }, { "levels", sc_levels }, { "mixui", sc_mixui }, { "fx", sc_fx }, { "editor2", sc_editor2 }, { "serve", sc_serve }, { "vis", sc_vis }, { "banksave", sc_banksave }, { "punch", sc_punch }, { "film", sc_film }, { "inst", sc_inst }, { "film2", sc_film2 }, { "bigproj", sc_bigproj }, { "bigcut", sc_bigcut }, { "punch2", sc_punch2 }, { "crumb", sc_crumb }, { "nan", sc_nan }
+    { "monkey", sc_monkey }, { "import", sc_import }, { "midi", sc_midi }, { "rescue", sc_rescue }, { "calib", sc_calib }, { "settings", sc_settings }, { "play", sc_play }, { "levels", sc_levels }, { "mixui", sc_mixui }, { "fx", sc_fx }, { "editor2", sc_editor2 }, { "serve", sc_serve }, { "vis", sc_vis }, { "banksave", sc_banksave }, { "punch", sc_punch }, { "film", sc_film }, { "inst", sc_inst }, { "film2", sc_film2 }, { "bigproj", sc_bigproj }, { "bigcut", sc_bigcut }, { "punch2", sc_punch2 }, { "crumb", sc_crumb }, { "nan", sc_nan }, { "sweep", sc_sweep }
 #if BOARD_SMK37
-    , { "smk", sc_smk }, { "smk-reboot", sc_smk_reboot }, { "smk-leftover", sc_smk_leftover }
+    , { "smk", sc_smk }, { "pianowav", sc_pianowav }, { "smkdemo", sc_smkdemo }, { "smk-reboot", sc_smk_reboot }, { "smk-leftover", sc_smk_leftover }
 #endif
 };
 static void (*tw_sc)(void);
