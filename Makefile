@@ -55,8 +55,8 @@ TWINSRC = host/twin.c host/hal.c app/project.c app/psound.c app/presets.c app/pr
 # scenarios (host/twin.c sc_smk*); after BOARD=smk37 fw/build.sh
 twin-smk: build/twin-smk
 	sh host/twin-smk.sh
-build/twin-smk: $(TWINSRC) engine/piano.c fw/main.c fw/smk.inc host/twin.h
-	mkdir -p build && gcc -DHOST -DBOARD_SMK37=1 -O1 -g -std=gnu11 -w -ffp-contract=off -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -o $@ $(TWINSRC) engine/piano.c -lm
+build/twin-smk: $(TWINSRC) engine/piano.c app/fonts_large.c fw/main.c fw/smk.inc host/twin.h
+	mkdir -p build && gcc -DHOST -DBOARD_SMK37=1 -O1 -g -std=gnu11 -w -ffp-contract=off -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -o $@ $(TWINSRC) engine/piano.c app/fonts_large.c -lm
 twin: build/twin build/fw/fw.area
 	sh host/twin.sh 60 "1 2"
 build/twin: $(TWINSRC) fw/main.c host/twin.h

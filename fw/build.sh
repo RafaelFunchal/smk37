@@ -25,7 +25,7 @@ for f in engine/drumkits.c engine/fm6_patches.c engine/slice.c hal/fm1/irq.c $HB
   "$TC/clang" $(echo "$CF" | sed 's/-O2/-Os/') -c $f -o $O/o/$(basename $f .c).o
 done
 # what runs seldom, or once a screen: the smallest (3.1.6: the room for the visualiser)
-for f in engine/slice_scan.c app/demo_song.c app/fonts.c app/presets.c app/preset_data.c app/sloopimport.c app/sloop_kinds.c app/usersnd.c \
+for f in engine/slice_scan.c app/demo_song.c app/fonts.c ${BF:+app/fonts_large.c} app/presets.c app/preset_data.c app/sloopimport.c app/sloop_kinds.c app/usersnd.c \
          app/xbank.c app/engdesc.c app/project.c app/gfx.c app/vis.c app/ui.c app/edproto.c; do
   "$TC/clang" $(echo "$CF" | sed 's/-O2/-Oz/') -c $f -o $O/o/$(basename $f .c).o
 done

@@ -87,6 +87,9 @@ typedef struct {
 } ui_view;
 
 void ui_draw(const ui_view *v);
+#if BOARD_SMK37
+extern uint8_t ui_large;                                   /* HOME > SCREEN > TEXT: 1 LARGE (the small type a step larger) */
+#endif
 /* the screen's colours (HOME > SCREEN > COLOR): NIGHT, SLOOP's GREEN AMBER CYAN RED MONO, or your theme */
 typedef struct { uint16_t bg, panel, panel2, line, txt, dim; } ui_palette;
 extern ui_palette ui_pal;

@@ -4,6 +4,15 @@
  * main information in font_m and font_l (18 and 25 px), light on near black. */
 #include "ui.h"
 #include "gfx.h"
+/* FS: the small type: on the SMK-37, a step larger with HOME > SCREEN > TEXT LARGE (app/fonts_large.c font_s2); a text
+ * that does not fit its place in it is drawn in font_s, as before (fit) */
+#if BOARD_SMK37
+extern const gfx_font font_s2;
+uint8_t ui_large;
+#define FS (ui_large ? &font_s2 : &font_s)
+#else
+#define FS (&font_s)
+#endif
 #include "vis.h"
 #include "../engine/engine.h"   /* (SP_*: which value is which) */
 
@@ -56,7 +65,10 @@ static void fit(const gfx_font *big, int x, int y, int w, int h, const char *s, 
     const gfx_font *f = big;
     int sp = 0;
     if (f == &font_l && gfx_text_w(f, s) > w) f = &font_m;
-    if (f == &font_m && gfx_text_w(f, s) > w) f = &font_s;
+    if (f == &font_m && gfx_text_w(f, s) > w) f = FS;
+#if BOARD_SMK37
+    if (f == &font_s2 && gfx_text_w(f, s) > w) f = &font_s;   /* (LARGE TEXT: what does not fit is drawn as it was) */
+#endif
     if (f == &font_s) while (sp > -2 && (gfx_spacing(sp), gfx_text_w(f, s)) > w) sp--;
     gfx_spacing(sp);
     if (f == &font_s && gfx_text_w(f, s) > w) {           /* (still too wide: the letters condensed, down to 75 %) */
@@ -82,16 +94,16 @@ static void fit2(int x, int y, int w, int h, const char *s, uint16_t c)
     int n = 0, at = -1, skip = 1, best = 0x7FFF;
     char a[12], b[12];
     while (s[n]) n++;
-    gfx_spacing(-2); int w1 = gfx_text_w(&font_s, s); gfx_spacing(0);
+    gfx_spacing(-2); int w1 = gfx_text_w(FS, s); gfx_spacing(0);
     if (w1 <= w || n > 11) { fit(&font_m, x, y, w, h, s, c, 1); return; }
     for (int i = 1; i < n - 1; i++) if (s[i] == ' ') {
         int j = 0; for (; j < i; j++) a[j] = s[j];
         a[j] = 0;
-        int wa = gfx_text_w(&font_s, a), wb = gfx_text_w(&font_s, s + i + 1), m = wa > wb ? wa : wb;
+        int wa = gfx_text_w(FS, a), wb = gfx_text_w(FS, s + i + 1), m = wa > wb ? wa : wb;
         if (m < best) { best = m; at = i; }
     }
     if (at < 0) {
-        gfx_spacing(-1); gfx_condense(62); int wc = gfx_text_w(&font_s, s); gfx_spacing(0); gfx_condense(100);
+        gfx_spacing(-1); gfx_condense(62); int wc = gfx_text_w(FS, s); gfx_spacing(0); gfx_condense(100);
         if (wc <= w) { fit(&font_m, x, y, w, h, s, c, 1); return; }
         at = (n + 1) / 2; skip = 0;
     }
@@ -156,7 +168,7 @@ static void top_bar(const ui_view *v)
     if (v->info) {                                        /* (the tempo stays; the transport and the status give way) */
         char t[8], *q = put_u(t, v->bpm); *q = 0;
         int e = gfx_text(&font_l, 4, 5, t, TXT);
-        gfx_text(&font_s, e + 4, 5 + font_l.cap - font_s.cap, "BPM", DIM);
+        gfx_text(FS, e + 4, 5 + font_l.cap - FS->cap, "BPM", DIM);
         info_line(v, 100, 2, 136, TOP_H - 4);
         return;
     }
@@ -164,7 +176,7 @@ static void top_bar(const ui_view *v)
     /* the tempo */
     p = put_u(b, v->bpm); *p = 0;
     int e = gfx_text(&font_l, 4, 5, b, TXT);
-    gfx_text(&font_s, e + 4, 5 + font_l.cap - font_s.cap, "BPM", DIM);
+    gfx_text(FS, e + 4, 5 + font_l.cap - FS->cap, "BPM", DIM);
     /* the transport: an icon, the bar and beat, the four beats */
     int x = 104;
     if (v->recording) gfx_disc(x + 7, 13, 7, RED);
@@ -183,7 +195,7 @@ static void info_line(const ui_view *v, int x, int y, int w, int h)
 {
     gfx_fill(x, y, w, h, BG);
     gfx_fill(x, y + h - 2, w, 2, YEL);
-    const gfx_font *f = gfx_text_w(&font_m, v->info) <= w - 4 ? &font_m : &font_s;   /* (the larger letters when they fit) */
+    const gfx_font *f = gfx_text_w(&font_m, v->info) <= w - 4 ? &font_m : FS;   /* (the larger letters when they fit) */
     fit(f, x + 2, y + (h - 2 - f->cap) / 2, w - 4, f->cap, v->info, TXT, 0);
 }
 /* ---------------------------------------------------------------- the track header (on the pages) */
@@ -241,7 +253,7 @@ static void footer(const ui_view *v)
         if (k->dial && k->bar >= 0) dial(x + 30, top + 12, 12, 4, k->bar, kc, k->hot ? YEL : TXT);
         else if (k->dial) gfx_rframe(x + 18, top, 24, 24, 12, 2, gfx_mix(BG, kc, 12));
         else gfx_rfill(x + 8, top + 9, 44, 5, 2, kc);
-        fit(&font_s, x + 2, top + 26, 56, font_s.cap, k->label, k->hot ? YEL : DIM, 1);
+        fit(FS, x + 2, top + 26, 56, FS->cap, k->label, k->hot ? YEL : DIM, 1);
         fit(&font_m, x + 2, top + 40, 56, font_m.cap, k->value, k->hot ? YEL : TXT, 1);   /* (3.3.6: 2 px up, the battery's line under) */
     }
 }
@@ -254,13 +266,13 @@ static void layer_title(const ui_view *v)
     if (v->info) { info_line(v, x, 4, w, 34); gfx_fill(4, 41, 232, 1, LINE); return; }
     if (!v->sub[0]) { gfx_fill(4, 41, 232, 1, LINE); return; }
     /* the line beside the title: on one line if it fits, else two, cut at its " · " */
-    if (gfx_text_w(&font_s, v->sub) <= w) gfx_text(&font_s, x, 8 + font_l.cap - font_s.cap, v->sub, DIM);
+    if (gfx_text_w(FS, v->sub) <= w) gfx_text(FS, x, 8 + font_l.cap - FS->cap, v->sub, DIM);
     else {
         char a[40], b[40]; int i = 0, j = 0, cut = -1;
         for (int k = 0; v->sub[k]; k++) if (v->sub[k] == ' ' && (unsigned char)v->sub[k + 1] == 0xC2) { cut = k; break; }
         if (cut < 0) {                                        /* (squeezed if it fits so; else left out) */
             int n = 0; while (v->sub[n]) n++;
-            if (gfx_text_w(&font_s, v->sub) - 2 * n <= w) fit(&font_s, x, 8 + font_l.cap - font_s.cap, w, font_s.cap, v->sub, DIM, 0);
+            if (gfx_text_w(FS, v->sub) - 2 * n <= w) fit(FS, x, 8 + font_l.cap - FS->cap, w, FS->cap, v->sub, DIM, 0);
             gfx_fill(4, 41, 232, 1, LINE); return;
         }
         for (; i < cut && i < 39; i++) a[i] = v->sub[i];
@@ -319,7 +331,7 @@ static void punch_tiles(const ui_view *v)
         if (!gfx_visible(x - 4, y - 4, w + 8, h + 8)) continue;
         int on = t->style == T_WHITE;
         gfx_rfill(x, y, w, h, 3, on ? TXT : PANEL2);
-        fit(&font_s, x + 2, y, w - 4, h, t->text, on ? BG : TXT, 1);
+        fit(FS, x + 2, y, w - 4, h, t->text, on ? BG : TXT, 1);
     }
     for (int j = 0; j < 11; j++) {
         const ui_tile *t = &v->btile[j];
@@ -329,7 +341,7 @@ static void punch_tiles(const ui_view *v)
         int on = t->style == T_WHITE;
         gfx_rfill(x, y, w, h, 3, on ? TXT : PANEL);
         gfx_rframe(x, y, w, h, 3, 1, on ? TXT : LINE);
-        fit(&font_s, x + 2, y, w - 4, h, t->text, on ? BG : DIM, 1);
+        fit(FS, x + 2, y, w - 4, h, t->text, on ? BG : DIM, 1);
     }
 }
 
@@ -351,16 +363,17 @@ static void page_tracks(const ui_view *v)
         uint16_t c = v->col[t], cc = v->mute[t] ? dim(c) : c;
         if (t == v->trk) gfx_rfill(2, y, 236, 27, 5, PANEL);
         char n[2] = { (char)('1' + t), 0 };
-        if (v->mute[t]) { gfx_rframe(5, y + 3, 21, 21, 4, 2, cc); gfx_text_c(&font_s, 15, y + 3 + (21 - font_s.cap) / 2, n, cc); }
-        else { gfx_rfill(5, y + 3, 21, 21, 4, c); gfx_text_c(&font_s, 15, y + 3 + (21 - font_s.cap) / 2, n, BG); }
+        if (v->mute[t]) { gfx_rframe(5, y + 3, 21, 21, 4, 2, cc); gfx_text_c(FS, 15, y + 3 + (21 - FS->cap) / 2, n, cc); }
+        else { gfx_rfill(5, y + 3, 21, 21, 4, c); gfx_text_c(FS, 15, y + 3 + (21 - FS->cap) / 2, n, BG); }
         /* the sound and its kind, a badge */
         char nm[20]; sound_name(nm, v, t);
         const char *badge = v->rec[t] ? "REC" : v->solo[t] ? "SOLO" : v->mute[t] ? "MUTE" : 0;
         uint16_t bc = v->solo[t] && !v->rec[t] ? YEL : RED;
-        int bw = badge ? gfx_text_w(&font_s, badge) + 8 : 0;
-        int e = gfx_text(&font_s, 31, y + 3, nm, t == v->trk ? TXT : DIM);
-        if (v->kind[t] && e + 6 + gfx_text_w(&font_s, v->kind[t]) < 234 - bw) gfx_text(&font_s, e + 6, y + 3, v->kind[t], cc);
-        if (badge) gfx_text_r(&font_s, 234, y + 3, badge, bc);
+        const gfx_font *rf = FS; if (rf != &font_s && v->kind[t] && 31 + gfx_text_w(rf, nm) + 6 + gfx_text_w(rf, v->kind[t]) >= 234 - (badge ? gfx_text_w(rf, badge) + 8 : 0)) rf = &font_s;   /* (LARGE: both, or both as before) */
+        int bw = badge ? gfx_text_w(rf, badge) + 8 : 0;
+        int e = gfx_text(rf, 31, y + 3, nm, t == v->trk ? TXT : DIM);
+        if (v->kind[t] && e + 6 + gfx_text_w(rf, v->kind[t]) < 234 - bw) gfx_text(rf, e + 6, y + 3, v->kind[t], cc);
+        if (badge) gfx_text_r(rf, 234, y + 3, badge, bc);
         /* the steps, the level */
         for (int i = 0; i < 16; i++) step_cell(31 + i * 11 + (i / 4) * 2, y + 19, 9, 5, v->cells[t][i], cc);
         gfx_fill(214, y + 19, 20, 5, LINE);
@@ -390,9 +403,10 @@ static void page_title(const ui_view *v)
     if (!gfx_visible(0, MAIN_Y - 4, GFX_W, 22)) return;
     /* the page's name, and the track's engine at the right if both fit (else the name alone, squeezed if need be) */
     const char *k = v->kind[v->trk];
-    int kw = k ? gfx_text_w(&font_s, k) : 0, nw = gfx_text_w(&font_s, v->page_name);
-    if (k && nw + 10 + kw <= 228) { gfx_text(&font_s, 6, MAIN_Y + 2, v->page_name, DIM); gfx_text_r(&font_s, 234, MAIN_Y + 2, k, v->col[v->trk]); }
-    else fit(&font_s, 6, MAIN_Y + 2, 228, font_s.cap, v->page_name, DIM, 0);
+    const gfx_font *pf = FS; if (pf != &font_s && k && gfx_text_w(pf, v->page_name) + 10 + gfx_text_w(pf, k) > 228) pf = &font_s;   /* (LARGE: both, or both as before) */
+    int kw = k ? gfx_text_w(pf, k) : 0, nw = gfx_text_w(pf, v->page_name);
+    if (k && nw + 10 + kw <= 228) { gfx_text(pf, 6, MAIN_Y + 2, v->page_name, DIM); gfx_text_r(pf, 234, MAIN_Y + 2, k, v->col[v->trk]); }
+    else fit(FS, 6, MAIN_Y + 2, 228, FS->cap, v->page_name, DIM, 0);
 }
 static int vis_on(void) { return gfx_visible(0, VIS_Y - 2, GFX_W, VIS_H + 4); }
 static void env_shape(const ui_view *v, float *y, float scale, float base)
@@ -542,7 +556,7 @@ static void page_kit(const ui_view *v)
         int on = i == v->pad_hit, mu = (v->pad_mute >> i) & 1;
         gfx_rfill(x, y, w, h, 3, on ? TXT : PANEL);
         if (mu) gfx_rframe(x, y, w, h, 3, 1, RED);
-        fit(&font_s, x + 2, y, w - 4, h, v->pad_names ? v->pad_names[i] : "", mu && !on ? RED : on ? BG : DIM, 1);
+        fit(FS, x + 2, y, w - 4, h, v->pad_names ? v->pad_names[i] : "", mu && !on ? RED : on ? BG : DIM, 1);
     }
 }
 static void page_mixer(const ui_view *v)
@@ -556,13 +570,13 @@ static void page_mixer(const ui_view *v)
         if (t == v->trk) gfx_rframe(x - 2, MAIN_Y + 18, 48, 80, 6, 2, TXT);
         char n[2] = { (char)('1' + t), 0 };
         gfx_rfill(x, MAIN_Y + 20, 44, 18, 4, c);
-        gfx_text_c(&font_s, x + 22, MAIN_Y + 20 + (18 - font_s.cap) / 2, n, BG);
+        gfx_text_c(FS, x + 22, MAIN_Y + 20 + (18 - FS->cap) / 2, n, BG);
         int bh = 36, by = MAIN_Y + 41, lh = bh * v->level[t] / 100;
         gfx_rfill(x + 10, by, 24, bh, 4, PANEL);
         if (lh > 0) gfx_rfill(x + 10, by + bh - lh, 24, lh, lh >= 8 ? 4 : 0, c);
-        if (v->mute[t]) gfx_text_c(&font_s, x + 22, MAIN_Y + 80, "OFF", RED);
-        else if (v->solo[t]) gfx_text_c(&font_s, x + 22, MAIN_Y + 80, "SOLO", YEL);
-        else { p = put_u(b, v->level[t]); *p = 0; gfx_text_c(&font_s, x + 22, MAIN_Y + 80, b, TXT); }
+        if (v->mute[t]) gfx_text_c(FS, x + 22, MAIN_Y + 80, "OFF", RED);
+        else if (v->solo[t]) gfx_text_c(FS, x + 22, MAIN_Y + 80, "SOLO", YEL);
+        else { p = put_u(b, v->level[t]); *p = 0; gfx_text_c(FS, x + 22, MAIN_Y + 80, b, TXT); }
     }
 }
 static void bar_row(int y, const char *label, int val, int bipolar, uint16_t c)
@@ -595,7 +609,7 @@ static void page_play(const ui_view *v)
     for (int i = 0; i < 4; i++) {
         int x = 6 + i * 58, on = i == m;
         gfx_rfill(x, VIS_Y + 2, 54, 24, 5, on ? c : PANEL);
-        fit(&font_s, x + 2, VIS_Y + 2, 50, 24, M[i], on ? BG : DIM, 1);
+        fit(FS, x + 2, VIS_Y + 2, 50, 24, M[i], on ? BG : DIM, 1);
     }
     int g = v->prm[SP_GLIDE], y0 = VIS_Y + 64, y1 = VIS_Y + 38, x0 = 70, w = 2 + g * 130 / 100;
     gfx_fill(VIS_X + 4, y0, x0 - VIS_X - 4, 3, TXT);
@@ -727,7 +741,7 @@ static void page_song(const ui_view *v)
     if (!v->sg_n && gfx_visible(4, 70, 232, 60)) {
         gfx_rfill(4, 74, 232, 60, 8, PANEL);
         fit(&font_m, 12, 78, 216, 24, "NO SONG", TXT, 1);
-        fit(&font_s, 12, 106, 216, 18, "KNOB 4: ADD LINES", DIM, 1);
+        fit(FS, 12, 106, 216, 18, "KNOB 4: ADD LINES", DIM, 1);
         return;
     }
     for (int i = 0; i < v->sg_n && i < 5; i++) {
@@ -761,7 +775,7 @@ static void page_soon(const ui_view *v)
     if (!gfx_visible(0, MAIN_Y + 18, GFX_W, 80)) return;
     gfx_rfill(4, MAIN_Y + 22, 232, 64, 8, PANEL);
     fit(&font_m, 12, MAIN_Y + 30, 216, 22, "NEXT VERSION", TXT, 1);
-    fit(&font_s, 12, MAIN_Y + 58, 216, 18, v->sub, DIM, 1);
+    fit(FS, 12, MAIN_Y + 58, 216, 18, v->sub, DIM, 1);
 }
 static void toast(const ui_view *v)                       /* (3.1.2, as Sam asked: at the top, over the bar; the page stays seen) */
 {
@@ -769,7 +783,7 @@ static void toast(const ui_view *v)                       /* (3.1.2, as Sam aske
         if (!gfx_visible(4, 2, 232, 42)) return;
         gfx_rfill(4, 2, 232, 42, 8, PANEL2);
         gfx_rframe(4, 2, 232, 42, 8, 2, YEL);
-        gfx_text_c(&font_s, 120, 8, "SAVING", YEL);
+        gfx_text_c(FS, 120, 8, "SAVING", YEL);
         gfx_fill(24, 29, 192, 8, LINE);
         gfx_fill(24, 29, 192 * v->save_pct / 100, 8, YEL);
         return;

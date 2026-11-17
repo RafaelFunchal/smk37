@@ -17,7 +17,7 @@ SECTIONS {
   /* the interface's code and its tables, run and read from the flash window (3.0B10): never while a save has the
    * window off (fw/main.c). The image: the stub at 0x120, this at 0x400, then the RAM image (fw/xip.ld) */
   .xtext : {
-    */ui.o(.text* .rodata*) */gfx.o(.text* .rodata*) */fonts.o(.text* .rodata*) */presets.o(.text* .rodata*)
+    */ui.o(.text* .rodata*) */gfx.o(.text* .rodata*) */fonts.o(.text* .rodata*) */fonts_large.o(.text* .rodata*) */presets.o(.text* .rodata*)
     */preset_data.o(.text* .rodata*) */engdesc.o(.text* .rodata*) */project.o(.text* .rodata*) */harmony.o(.text* .rodata*)
     */project.o(.text* .rodata*) */main.o(.rodata*) */sloopimport.o(.text* .rodata*) */sloop_kinds.o(.text* .rodata*) */usersnd.o(.text* .rodata*) */xbank.o(.text* .rodata*) */vis.o(.text* .rodata*) */slice_scan.o(.text* .rodata*) */demo_song.o(.text* .rodata*) */drumkits.o(.text* .rodata*)
     *(.xtext*)

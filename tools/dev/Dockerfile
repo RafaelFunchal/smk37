@@ -4,7 +4,7 @@
 FROM debian:trixie
 ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ make python3 python3-numpy python3-pil nodejs \
-    xz-utils curl ca-certificates git file bsdextrautils && rm -rf /var/lib/apt/lists/*
+    xz-utils curl ca-certificates git file bsdextrautils fonts-inter && rm -rf /var/lib/apt/lists/*
 ARG TC=pi32v2-23.1.5-2
 RUN A=$([ "$TARGETARCH" = arm64 ] && echo linux-arm64 || echo linux-x64) && mkdir -p /opt/pi32v2 && cd /opt/pi32v2 \
  && curl -fsSL -o tc.tar.xz https://github.com/jvitkauskas/pi32v2-llvm/releases/download/$TC/pi32v2-llvm-${TC#pi32v2-}-$A.tar.xz \

@@ -974,7 +974,11 @@ COLD static int force_of(int vel, int acc) { return acc ? 4 : vel < 50 ? 0 : vel
 static const char *const FORCE[5] = { "GHOST", "SOFT", "NORM", "HARD", "ACC" };
 /* ---------------------------------------------------------------- HOME: the menu's sections, the calibration */
 static const char *const HOME_SEC[5] = { "PROJECT", "SCREEN 1/4", "LIGHTS 2/4", "AUDIO 3/4", "SEQ · SYSTEM 4/4" };
+#if BOARD_SMK37                                        /* (-5: TEXT, NORMAL or LARGE: the SMK-37's) */
+static const int8_t HOME_ROW[5][4] = { { -1, -1, -1, -1 }, { -4, HS_ACCEL, -5, -1 }, { HS_LIGHTS, HS_KEYS, HS_NOTES, -1 },
+#else
 static const int8_t HOME_ROW[5][4] = { { -1, -1, -1, -1 }, { -4, HS_ACCEL, -1, -1 }, { HS_LIGHTS, HS_KEYS, HS_NOTES, -1 },
+#endif
                                        { HS_LOWCUT, HS_USB, HS_RATE, HS_RESO }, { HS_DPREV, HS_CORE2, -2, -3 } };
 static const char *const HS_LABEL[HS_N] = { "ACCEL", "LIGHTS", "KEYS", "NOTES", "SPEAKER", "USB", "RATE", "RESO", "PREVIEW", "CORE 2" };
 COLD static const char *home_value(int i, char *b)
@@ -1038,6 +1042,9 @@ COLD static void home_knob(int sec, int kn, int d)
         t_input = time_ticks(); return;
     }
     if (i == -3) { if (d > 0) cal_start(); return; }
+#if BOARD_SMK37
+    if (i == -5) { ui_large = (uint8_t)(d > 0); say(ui_large ? "TEXT: LARGE" : "TEXT: NORMAL"); return; }   /* (TEXT) */
+#endif
     if (i == -4) {                                       /* COLOR: the palettes, then your theme */
         int n = UI_NTHEMES + (theme_ok() ? 1 : 0), c = scr_color + d;
         scr_color = (uint8_t)(c < 0 ? 0 : c > n - 1 ? n - 1 : c); color_apply(); return;
@@ -1336,6 +1343,9 @@ COLD static void fill_view(ui_view *v)
                 int r = HOME_ROW[home_sec][i];
                 if (r == -2) { char c[8]; *put_u(c, (uint32_t)ml_count()) = 0; knob(v, i, "LEARN", ml_count() ? c : "NONE", -1, 0); continue; }
                 if (r == -3) { knob(v, i, "CALIBR.", "→", -1, 0); continue; }
+#if BOARD_SMK37
+                if (r == -5) { knob(v, i, "TEXT", ui_large ? "LARGE" : "NORMAL", ui_large * 100, 0); continue; }
+#endif
                 if (r == -4) { knob(v, i, "COLOR", scr_color < UI_NTHEMES ? ui_theme_name[scr_color] : "YOURS", scr_color * 100 / UI_NTHEMES, 0); continue; }
                 if (r == -1) { v->knob[i].label = 0; continue; }
                 knob(v, i, HS_LABEL[r], home_value(r, b), hs[r] * 100 / HS_MAX[r], 0);
@@ -1711,7 +1721,7 @@ COLD static void proj_extra(project_extra *xp)
     x.home[77] = (uint8_t)(smk_layer + 1); x.home[78] = (uint8_t)(smk_lower + 1);
     x.home[79] = (uint8_t)(smk_split > -100 ? smk_split + 64 : 0);
     /* (and its settings, in the FM-1's calibration bytes, never used on the SMK-37: byte 10 stays 0xFF, not 1) */
-    x.home[11] = smk_kv; x.home[12] = smk_sens; x.home[13] = smk_light; x.home[14] = smk_krev;
+    x.home[11] = smk_kv; x.home[12] = smk_sens; x.home[13] = smk_light; x.home[14] = smk_krev; x.home[15] = ui_large;
 #endif
     *xp = x;
 }
@@ -1776,6 +1786,7 @@ COLD static void home_from(const uint8_t *h)
         if (h[12] <= 3) smk_sens = h[12];
         if (h[13] <= 2) smk_light = h[13];
         if (h[14] <= 1) smk_krev = h[14];
+        if (h[15] <= 1) ui_large = h[15];
     }
     smk_settings_apply();
 #endif
