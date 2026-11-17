@@ -2319,6 +2319,32 @@ static void sc_smk(void)
       smk_layer = ly; smk_lower = lo;
       printf("[%8.3f]    CONCERT, dry: held peak %.4f; 2.5-3.5 s after the release, %.9f\n", tw_s(), held, tail);
       EXPECT(held > 0.005 && tail < 1e-7, "CONCERT: something still sounds after the note is over (%.9f): an effect's tail", tail); }
+    /* ARP on the SMK-37's own ARP button: tapped, its page (K5 MODE); a chord held, played as an arpeggio; held with a
+     * key, ROLL (the note again on the grid) */
+    { int8_t ly = smk_layer, lo = smk_lower; smk_layer = smk_lower = -1;
+      select_track(t); trk = t; tap(B_HOME); wait_ms(100);
+      uint32_t a0 = S.next_age;
+      keydown(7); keydown(11); keydown(14); wait_ms(1500); keyup(7); keyup(11); keyup(14); wait_ms(300);
+      uint32_t plain = S.next_age - a0;
+      tap(B_ARP); wait_ms(80);
+      EXPECT(sticky == PG_ARP, "ARP tapped: not the ARP page (%d)", sticky);
+      turn(ENC_KNOB1, 1); wait_ms(80);
+      EXPECT(arpc[trk].mode == AM_UP, "ARP: K5 did not set MODE UP (%d)", arpc[trk].mode);
+      shot("smk-arp");
+      a0 = S.next_age;
+      keydown(7); keydown(11); keydown(14); wait_ms(1500); keyup(7); keyup(11); keyup(14); wait_ms(300);
+      uint32_t arp = S.next_age - a0;
+      turn(ENC_KNOB1, -1); wait_ms(80);
+      EXPECT(arpc[trk].mode == AM_OFF, "ARP: K5 back did not turn it OFF (%d)", arpc[trk].mode);
+      tap(B_HOME); wait_ms(100);
+      a0 = S.next_age;
+      press(B_ARP); wait_ms(60); keydown(9); wait_ms(1500); keyup(9); release(B_ARP); wait_ms(300);
+      uint32_t roll = S.next_age - a0;
+      smk_layer = ly; smk_lower = lo;
+      printf("[%8.3f]    ARP: a 3-note chord held 1.5 s: %u notes plain, %u with ARP UP; ROLL (ARP held, one key): %u\n", tw_s(), plain, arp, roll);
+      EXPECT(plain == 3, "a chord without ARP: %u notes (3)", plain);
+      EXPECT(arp >= 8, "ARP UP: a chord held 1.5 s gave %u notes (an arpeggio: many more than 3)", arp);
+      EXPECT(roll >= 4, "ROLL (ARP held with a key): %u notes (the note again on the grid)", roll); }
     /* the USB light along the bottom: at the tempo (an eighth a step), on the sequencer's eighths while it plays */
     { float b0 = Q.bpm; int steps[2];
       for (int k = 0; k < 2; k++) {
