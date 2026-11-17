@@ -33,6 +33,10 @@ knobs: { K1: master, K2: select, K3: algorithm, K4: presets, K5-K8: knob 1-4 }
 buttons:
   map: printed               # PATCH=HOME BT=SAVE SCALE=SEL CHORD=ENV NOTE REPEAT=LFO PARA=EDIT GLOBE=GLO
   extra: { KNOB BANK: drum pads, FADER BANK: fader banks, "<": previous track / step page, ">": next track / step page }
+keys_setup:                  # KNOB BANK held
+  K3: layer track (OFF, synth tracks): every key also plays it
+  K4: split track (OFF, synth tracks, drums): the keys below the split point play it
+  key: the split point (the same key again: off)
 pedal: sustain
 open_questions:
   - on a unit: pad threshold, encoder direction, the piano's CPU load with 24 voices

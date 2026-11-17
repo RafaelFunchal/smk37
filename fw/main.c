@@ -86,6 +86,12 @@
 #define SL_READ smk_no_read                 /* SLOOP 2.8's data is the FM-1's: none here (its places hold the piano) */
 static int smk_no_read(uint32_t a, void *d, uint32_t n) { (void)a; (void)d; (void)n; return -1; }
 static void smk_release(int k);           /* (fw/smk.inc, included before the timer's tick) */
+static void smk_layer_off(int k);
+static void smk_key_on(int k, const uint8_t *n, int nn, float vel, uint32_t lat);
+static int smk_kb_held(void);
+static int smk_keys_setup_key(int k);
+static void smk_keys_setup_knobs(void);
+static void smk_keys_init(void);
 static uint64_t smk_sus_keys;
 #else
 #define SMK_LOWBSS
@@ -1972,6 +1978,9 @@ static void kh_release(void)
 }
 static void key_off(int k, uint32_t lat)
 {
+#if BOARD_SMK37
+    smk_layer_off(k);                                         /* (KEYS: the layer's notes of this key end with it) */
+#endif
     gb_owner o = GB_OWNER(OWN_KEY, 0);
     if (key_nn[k] && kbd_hold(key_trk[k])) {                  /* KBD HOLD: kept sounding */
         if (kh_trk != key_trk[k]) { kh_release(); kh_trk = key_trk[k]; }
@@ -3046,6 +3055,9 @@ COLD static void keys(void)
         }
         if (!(pr & (1u << k))) continue;
         key_off(k, latency_frames());                        /* a press in a layer plays nothing */
+#if BOARD_SMK37
+        if (smk_keys_setup_key(k)) continue;                 /* (KNOB BANK held: this key the split point) */
+#endif
         int w = white_of[k];
         if (L & (1u << BTN_FX)) {                            /* PUNCH: this key's effect, while held */
             layer_used = 1; punch_key = k; snd_punch(&S, punch_of_key(k));
@@ -3180,7 +3192,11 @@ COLD static void keys(void)
             if (project_empty() && !rec_mode) { if (!ft_on) { ft_on = 1; ft_n = 0; ft_t0 = time_ticks(); ft_said = 0; } }
             else if (!rec_count) { record_now(trk); lat = 0; }   /* (this note: step 1; COUNT-IN: notes only sound) */
         }
+#if BOARD_SMK37
+        smk_key_on(k, nts, nn, vel, lat);                    /* (KEYS: the split's track below its point; the layer) */
+#else
         key_on(k, trk, nts, nn, vel, lat);
+#endif
         if (L & (1u << BTN_ARP)) {                           /* ROLL: again on the grid while held */
             layer_used = 1;
             uint32_t now = Q.playing ? Q.tick : roll_clock, iv = ROLL_TICKS[roll_rate];
@@ -3584,6 +3600,9 @@ COLD static void set_param(int pi, int d)                 /* a sound value turne
 }
 COLD static void encoders(void)
 {
+#if BOARD_SMK37
+    if (smk_kb_held()) { smk_keys_setup_knobs(); return; }  /* (KNOB BANK held: K3 the layer, K4 the split's track) */
+#endif
     for (int e = 0; e < 7; e++) {
         int d = panel_enc_take(e) + ee[e]; ee[e] = 0;
         if (!d) continue;
@@ -4283,6 +4302,9 @@ COLD __attribute__((noinline)) static void start(uint32_t arg)
     panel_init();
     adc_init();
     keys_map();
+#if BOARD_SMK37
+    smk_keys_init();                                      /* (KEYS: the layer's table, in RAM never cleared) */
+#endif
     BOOT_STEP(5);
     if (c1 == 0 && cpu1_core_id() == 1u) two = 1;
     for (int k = 0; k < FM6_NBANK; k++) fb_nm[k][0] = 0;

@@ -44,7 +44,10 @@ names for the buttons and K5..K8 for KNOB 1..4.
 | Keys F3..G5 (the middle 27) | the FM-1's 27 keys, **with velocity** from your unit's factory curves |
 | Keys C3..E3 and G#5..C6 (the outer 10) | more notes, through the track's scale, chords and arpeggiator; on the drum track C3 KICK, D3 SNARE, E3 HAT, G#5 BELL, A5 OPEN, B5 CRASH, C6 RIDE |
 | 16 pads | the FM-1's 16 white keys (top row 1-8, bottom 9-16): notes, drums, steps (SEQ), patterns (BT), the mix (GLOBE), HOME's keys; with velocity; lit in the track's colour |
-| KNOB BANK | DRUM PADS on / off: the pads play the drum kit whatever track the keys play (its light on) |
+| KNOB BANK tapped | DRUM PADS on / off: the pads play the drum kit whatever track the keys play (its light on) |
+| KNOB BANK held + K3 | LAYER: a second synth track every key plays too, the same notes and velocity (OFF, or a track) |
+| KNOB BANK held + K4 | SPLIT's track: what the keys below the split point play (OFF, a synth track, or the drums) |
+| KNOB BANK held + a key | the split point at that key (keys below it go to the SPLIT's track); the same key again: no split |
 | FADER BANK | the faders' bank: A level, B filter, C reverb, D delay of synth tracks 1-4; E the drums' level, filter, reverb, delay (its light on off bank A; OCTAVE- held: back) |
 | Faders 1-4 | the bank's four; a fader takes over once it reaches the value (no jump) |
 | < / > | the previous / next track; with SEQ held or on STEPS: the step page |
@@ -60,6 +63,20 @@ names for the buttons and K5..K8 for KNOB 1..4.
 | USB | MIDI and audio as on the FM-1, named "SMK-37 SLOOP 3" (the web editor finds it) |
 
 Power-on: **OCTAVE-** held, RESCUE (an empty project; yours is kept); **SEQ PLAY** held, m-bootloader's menu.
+
+## Layers and splits
+
+SLOOP 3's five tracks always play together from the sequencer. On the keys, KNOB BANK sets up two more ways to play
+them live (the screen says what is set each time):
+
+- **Layer:** a piano on track 1 and a pad on track 2, both from one key. Hold KNOB BANK, turn **K3** to the pad's track.
+- **Split:** a bass (or the drums) under your left hand. Hold KNOB BANK, press the key where the split goes (the keys below
+  it), turn **K4** to that part's track. The split part plays with its own track's scale, chords and arpeggiator.
+- Together: split bass on the left, piano and pad layered on the right; the drums on the pads (KNOB BANK tapped), and
+  the sequencer playing the rest.
+
+The sustain pedal holds both parts of a layer. REC records the selected track (the split's and the layer's notes are
+heard, not recorded). The layer and the split are not kept over a restart yet.
 
 ## The piano
 

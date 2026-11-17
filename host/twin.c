@@ -2199,6 +2199,62 @@ static void sc_smk(void)
     EXPECT(kick, "drum track: C3 is not the kick");
     /* < >: the tracks */
     int p0 = POS[trk]; xtap(SB_RIGHT); EXPECT(POS[trk] == (p0 + 1) % NTRK, "> : not the next track"); xtap(SB_LEFT); EXPECT(POS[trk] == p0, "< : not back");
+    /* KEYS: the layer (piano + pad) and the split, set with KNOB BANK held */
+    select_track(t); trk = t; oct = 0; wait_ms(80);
+    int t2 = smk_trk_shown(1), t3 = smk_trk_shown(2);
+    int pad = -1; for (int i = 0; i < gb_npresets; i++) if (gb_presets[i].kind == K_PAD) { pad = i; break; }
+    EXPECT(pad >= 0 && t2 != t && t3 != t && !is_drum(t2) && !is_drum(t3), "KEYS: the tracks for the test");
+    apply_preset(t2, pad); wait_ms(100);
+    int dp = smk_drumpads;
+    tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(60);
+    for (int i = 0; i < 8 && smk_layer != t2; i++) turn(ENC_ALGORITHM, 1);
+    tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
+    EXPECT(smk_layer == t2, "KNOB BANK + K3: the layer not track %d (%d)", t2, smk_layer);
+    EXPECT(smk_drumpads == dp, "KNOB BANK held for the setup: DRUM PADS toggled on its release");
+    EXPECT(trk == t, "KNOB BANK + K3: the track changed too");
+    keydown(9); wait_ms(80);
+    EXPECT(sounding(t, 62) && sounding(t2, 62), "LAYER: D4 not on both tracks (%d, %d)", sounding(t, 62), sounding(t2, 62));
+    keyup(9); wait_ms(80);
+    EXPECT(!sounding(t, 62) && !sounding(t2, 62), "LAYER: D4 let go, still on");
+    tw_pedal(1); wait_ms(60); keydown(9); wait_ms(60); keyup(9); wait_ms(100);
+    EXPECT(sounding(t, 62) && sounding(t2, 62), "LAYER + pedal: not held on both");
+    tw_pedal(0); wait_ms(120);
+    EXPECT(!sounding(t, 62) && !sounding(t2, 62), "LAYER + pedal up: still on");
+    /* the split at C4 (key 7), its track t3: G3 there alone, D4 on the track and its layer */
+    tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(60);
+    keydown(7); wait_ms(40); keyup(7);
+    for (int i = 0; i < 8 && smk_lower != t3; i++) turn(ENC_PRESETS, 1);
+    tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
+    EXPECT(smk_split == 7 && smk_lower == t3, "KNOB BANK + C4, K4: split %d, track %d", smk_split, smk_lower);
+    EXPECT(!sounding(t, 60) && !sounding(t3, 60), "the split's key played a note");
+    keydown(2); wait_ms(80);
+    EXPECT(sounding(t3, 55) && !sounding(t, 55) && !sounding(t2, 55), "SPLIT: G3 not on the split's track alone");
+    keyup(2); wait_ms(80);
+    EXPECT(!sounding(t3, 55), "SPLIT: G3 let go, still on");
+    keydown(9); wait_ms(80);
+    EXPECT(sounding(t, 62) && sounding(t2, 62) && !sounding(t3, 62), "SPLIT: D4 not on the track and its layer");
+    keyup(9); wait_ms(80);
+    tw_ext(0, 100); wait_ms(60);                              /* (an outer key, C3, below the split too) */
+    EXPECT(sounding(t3, 48) && !sounding(t, 48), "SPLIT: C3 not on the split's track");
+    tw_ext(0, 0); wait_ms(60);
+    /* the split's track the drums: F3 the first pad's sound */
+    tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(60);
+    for (int i = 0; i < 8 && smk_lower != dt; i++) turn(ENC_PRESETS, 1);
+    tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
+    EXPECT(smk_lower == dt, "K4: the split's track not the drums");
+    keydown(0); wait_ms(40);
+    int dr = 0; for (int i = 0; i < GB_NVOICE; i++) if (S.v[i].state != V_FREE && S.v[i].track == dt) dr = 1;
+    keyup(0); wait_ms(40);
+    EXPECT(dr, "SPLIT on the drums: F3 played no drum");
+    /* both off: the split's key again, K3 back to OFF */
+    tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(60);
+    keydown(7); wait_ms(40); keyup(7);
+    for (int i = 0; i < 8 && smk_layer != -1; i++) turn(ENC_ALGORITHM, 1);
+    tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
+    EXPECT(smk_split == -100 && smk_layer == -1, "KEYS off: split %d, layer %d", smk_split, smk_layer);
+    keydown(2); wait_ms(80);
+    EXPECT(sounding(t, 55) && !sounding(t2, 55) && !sounding(t3, 55), "KEYS off: G3 not on the track alone");
+    keyup(2); wait_ms(80);
     /* the project saved: only the SMK-37's data range written */
     select_track(t); trk = t;
     save_and_wait();

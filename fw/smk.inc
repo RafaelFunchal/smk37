@@ -11,7 +11,10 @@
  *   - WHEELS: pitch bend on the selected synth track (GLO > MIDI 3 BEND, +-1..12), the mod wheel a vibrato
  *   - PEDAL: sustain (the keys' notes held while it is down), CC 64 out
  *   - < >: the previous / next track (SEQ held, or on STEPS: the step page)
- *   - TRS jack: MIDI OUT, what goes out over USB */
+ *   - TRS jack: MIDI OUT, what goes out over USB
+ *   - KEYS (KNOB BANK held): K3 the LAYER, a second synth track every key plays too (a piano and a pad); K4 the SPLIT's
+ *     track, what the keys below the split point play (a bass, the drums); a key pressed: the split point there (the
+ *     same key again: no split). KNOB BANK tapped alone: DRUM PADS, as before */
 COLD static int smk_key_pos(int k) { return k < 32 ? k : k - 37; }    /* slots 27..31 G#5..C6, 32..36 C3..E3 (as -5..-1) */
 COLD static int smk_drum_outer(int pos)                               /* the drum lane an outer key plays */
 {
@@ -49,7 +52,7 @@ COLD static void smk_play(int k, int t, const uint8_t *n, int nn, float vel)
         if (project_empty() && !rec_mode) { if (!ft_on) { ft_on = 1; ft_n = 0; ft_t0 = time_ticks(); ft_said = 0; } }
         else if (!rec_count) { record_now(t); lat = 0; }
     }
-    key_on(k, t, n, nn, vel, lat);
+    if (t == trk) smk_key_on(k, n, nn, vel, lat); else key_on(k, t, n, nn, vel, lat);
 }
 COLD static void smk_outer(void)
 {
@@ -71,6 +74,7 @@ COLD static void smk_outer(void)
         if (!vel) { smk_release(k); continue; }
         smk_sus_keys &= ~(1ull << k);
         key_off(k, latency_frames());
+        if (smk_keys_setup_key(k)) continue;
         if (lay()) continue;
         uint8_t n[5]; int nn;
         if (is_drum(trk)) { n[0] = (uint8_t)smk_drum_outer(smk_key_pos(k)); nn = 1; }
@@ -141,15 +145,91 @@ static void smk_block(void)
     if (x != was || smk_bend_trk != t) { S.trk[t].bend = x; was = x; }   /* (a MIDI bend is kept while the wheels rest) */
     smk_bend_trk = (int8_t)t;
 }
+/* ---- KEYS: the layer and the split (KNOB BANK held: K3, K4, a key) */
+static int8_t smk_layer = -1, smk_lower = -1;               /* tracks (-1 none) */
+static int8_t smk_split = -100;                              /* the split point: keys at positions below it play smk_lower */
+static uint8_t smk_kb_used;                                  /* (KNOB BANK held and used: no DRUM PADS on its release) */
+static int8_t smk_lay_trk[PANEL_KEYS] GB_BOOTRAM; static uint8_t smk_lay_n[PANEL_KEYS] GB_BOOTRAM, smk_lay_notes[PANEL_KEYS][5] GB_BOOTRAM;   /* (smk_keys_init) */
+COLD static void smk_keys_init(void) { for (int k = 0; k < PANEL_KEYS; k++) { smk_lay_trk[k] = -1; smk_lay_n[k] = 0; } }
+COLD static int smk_kb_held(void) { return (smk_xbuttons() >> SB_KNOB_BANK) & 1u; }
+COLD static const char *smk_trk_name(int t, char *b)              /* "2 PAD SOFT" / "DRUMS" / "OFF" */
+{
+    if (t < 0) return "OFF";
+    if (is_drum(t)) return "DRUMS";
+    char *p = put_u(b, (uint32_t)POS[t] + 1u); p = put_s(p, " ");
+    int pi = preset_of[t]; p = put_s(p, pi >= 0 && pi < gb_npresets ? gb_presets[pi].name : gb_edesc[S.trk[t].patch.engine].name); *p = 0;
+    return b;
+}
+COLD static void smk_keys_say(void)
+{
+    char a[24], c[24], b[64], *p = put_s(b, "LAYER "); p = put_s(p, smk_trk_name(smk_layer, a));
+    p = put_s(p, " · SPLIT "); p = put_s(p, smk_split > -100 && smk_lower >= 0 ? smk_trk_name(smk_lower, c) : "OFF");
+    if (smk_split > -100 && smk_lower >= 0) { p = put_s(p, " < "); p = put_s(p, harm_note_name[((53 + smk_split) % 12 + 12) % 12]); p = put_u(p, (uint32_t)((53 + smk_split) / 12 - 1)); }
+    *p = 0; say(b);
+}
+COLD static int smk_next_trk(int cur, int d, int drums)           /* OFF, then the tracks in the order shown (synths; the drums if asked) */
+{
+    int order[NTRK + 1], n = 0; order[n++] = -1;
+    for (int pos = 0; pos < NTRK; pos++) { int t = smk_trk_shown(pos); if (!is_drum(t) || drums) order[n++] = t; }
+    int i = 0; while (i < n && order[i] != cur) i++;
+    if (i >= n) i = 0;
+    return order[((i + d) % n + n) % n];
+}
+COLD static void smk_keys_setup_knobs(void)
+{
+    int dl = panel_enc_take(ENC_ALGORITHM), ds = panel_enc_take(ENC_PRESETS);
+    for (int e = 0; e < 7; e++) if (e != ENC_ALGORITHM && e != ENC_PRESETS) (void)panel_enc_take(e);   /* (the others: nothing now) */
+    if (dl) { smk_layer = (int8_t)smk_next_trk(smk_layer, dl > 0 ? 1 : -1, 0); smk_kb_used = 1; smk_keys_say(); }
+    if (ds) { smk_lower = (int8_t)smk_next_trk(smk_lower, ds > 0 ? 1 : -1, 1); if (smk_lower >= 0 && smk_split == -100) smk_split = 7; smk_kb_used = 1; smk_keys_say(); }
+}
+COLD static int smk_keys_setup_key(int k)                    /* 1: the key was the split point's (KNOB BANK held) */
+{
+    if (!smk_kb_held()) return 0;
+    int pos = smk_key_pos(k);
+    smk_kb_used = 1;
+    if (smk_split == pos) smk_split = -100;
+    else { smk_split = (int8_t)pos; if (smk_lower < 0) smk_lower = (int8_t)smk_next_trk(-1, 1, 0); }
+    smk_keys_say();
+    return 1;
+}
+static void smk_layer_off(int k)
+{
+    int L = smk_lay_trk[k];
+    if (L < 0 || L >= NTRK) { smk_lay_trk[k] = -1; return; }
+    for (int i = 0; i < smk_lay_n[k]; i++) { if (arp_on(L)) arp_remove(L, smk_lay_notes[k][i]); else play_off(GB_OWNER(OWN_KEY, 0), L, smk_lay_notes[k][i]); }
+    smk_lay_trk[k] = -1; smk_lay_n[k] = 0;
+}
+/* a key's notes: below the split point on the split's track (its own scale and chords), else on the track selected and
+ * the layer (the same notes, the same velocity) */
+COLD static void smk_key_on(int k, const uint8_t *n, int nn, float vel, uint32_t lat)
+{
+    smk_layer_off(k);
+    if (smk_split > -100 && smk_lower >= 0 && smk_lower != trk && smk_key_pos(k) < smk_split) {
+        uint8_t m[5]; int saved = trk; trk = smk_lower;
+        int mn = is_drum(trk) && k >= 27 ? (m[0] = (uint8_t)smk_drum_outer(smk_key_pos(k)), 1) : notes_for_key(k, m);
+        trk = saved;
+        if (mn) key_on(k, smk_lower, m, mn, vel, lat);
+        return;
+    }
+    key_on(k, trk, n, nn, vel, lat);
+    int L = smk_layer;
+    if (L < 0 || L >= NTRK || L == trk || is_drum(L) || is_drum(trk)) return;
+    smk_lay_trk[k] = (int8_t)L; smk_lay_n[k] = (uint8_t)nn;
+    for (int i = 0; i < nn; i++) {
+        smk_lay_notes[k][i] = n[i];
+        if (arp_on(L)) arp_add(L, n[i], (int)(vel * 127.0f)); else play_on(GB_OWNER(OWN_KEY, 0), L, n[i], vel);
+    }
+}
 /* ---- the extra buttons */
 static uint8_t smk_drumpads;
 COLD static void smk_xbtns(void)
 {
     uint32_t rel, pr = smk_xbutton_edges(&rel);
-    if (!pr) return;
+    if (!(pr | rel)) return;
     t_input = time_ticks();
     if (pr & (1u << SB_FADER_BANK)) smk_fader_bank((held_btn & (1u << BTN_OCT_DOWN)) ? -1 : 1);
-    if (pr & (1u << SB_KNOB_BANK)) { smk_drumpads = (uint8_t)!smk_drumpads; say(smk_drumpads ? "PADS: THE DRUM KIT" : "PADS: THE WHITE KEYS"); }
+    if (pr & (1u << SB_KNOB_BANK)) smk_kb_used = 0;
+    if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used) { smk_drumpads = (uint8_t)!smk_drumpads; say(smk_drumpads ? "PADS: THE DRUM KIT" : "PADS: THE WHITE KEYS"); }
     int d = (pr & (1u << SB_LEFT)) ? -1 : (pr & (1u << SB_RIGHT)) ? 1 : 0;
     if (!d) return;
     if (lay_on(BTN_SEQ) || sticky == PG_STEPS || notes_on()) {   /* the step page */
