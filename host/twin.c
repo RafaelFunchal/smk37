@@ -2359,15 +2359,17 @@ static void sc_smk(void)
       EXPECT(arp >= 8, "ARP UP: a chord held 1.5 s gave %u notes (an arpeggio: many more than 3)", arp);
       EXPECT(roll >= 4, "ROLL (ARP held with a key): %u notes (the note again on the grid)", roll); }
     /* the USB light along the bottom: at the tempo (an eighth a step), on the sequencer's eighths while it plays */
-    { float b0 = Q.bpm; int steps[2];
+    /* (counted over 2 s of simulated time, measured: a wait runs a little past its milliseconds) */
+    { float b0 = Q.bpm; int steps[2]; double span[2];
       for (int k = 0; k < 2; k++) {
           seq_set_bpm(&Q, k ? 60.0f : 120.0f); wait_ms(300);
-          int n = 0, last = V.batt_usb; for (int i = 0; i < 200; i++) { wait_ms(10); if (V.batt_usb != last) { n++; last = V.batt_usb; } }
-          steps[k] = n;
+          int n = 0, last = V.batt_usb; double t0 = tw_s();
+          while (tw_s() - t0 < 2.0) { wait_ms(10); if (V.batt_usb != last) { n++; last = V.batt_usb; } }
+          steps[k] = n; span[k] = tw_s() - t0;
       }
-      printf("[%8.3f]    the USB light, stopped: %d steps in 2 s at 120 BPM, %d at 60\n", tw_s(), steps[0], steps[1]);
-      EXPECT(steps[0] >= 7 && steps[0] <= 9, "the USB light at 120 BPM: %d steps in 2 s (8: an eighth a step)", steps[0]);
-      EXPECT(steps[1] >= 3 && steps[1] <= 5, "the USB light at 60 BPM: %d steps in 2 s (4)", steps[1]);
+      printf("[%8.3f]    the USB light, stopped: %d steps in %.2f s at 120 BPM, %d in %.2f s at 60\n", tw_s(), steps[0], span[0], steps[1], span[1]);
+      EXPECT(abs(steps[0] - (int)(span[0] * 4.0 + 0.5)) <= 1, "the USB light at 120 BPM: %d steps in %.2f s (an eighth a step: 4 a second)", steps[0], span[0]);
+      EXPECT(abs(steps[1] - (int)(span[1] * 2.0 + 0.5)) <= 1, "the USB light at 60 BPM: %d steps in %.2f s (2 a second)", steps[1], span[1]);
       seq_set_bpm(&Q, 120.0f); tap(B_PLAY); wait_ms(200);
       int ok = 0, all = 0;
       for (int i = 0; i < 150; i++) { wait_ms(10); if (!Q.playing) continue; all++;
@@ -2376,9 +2378,11 @@ static void sc_smk(void)
       EXPECT(all > 100 && ok == all, "the USB light while playing: off the sequencer's eighths (%d of %d)", ok, all); }
     /* the word BPM blinks at the tempo: stopped, a blink a beat; playing, on the sequencer's beats, green on the first */
     { float b0 = Q.bpm; seq_set_bpm(&Q, 120.0f); wait_ms(300);
-      int on = 0, last = V.bpm_lit; for (int i = 0; i < 200; i++) { wait_ms(10); if (V.bpm_lit && !last) on++; last = V.bpm_lit; }
-      printf("[%8.3f]    the word BPM, stopped at 120: %d blinks in 2 s\n", tw_s(), on);
-      EXPECT(on >= 3 && on <= 5, "the word BPM at 120 BPM: %d blinks in 2 s (4)", on);
+      int on = 0, last = V.bpm_lit; double t0 = tw_s();
+      while (tw_s() - t0 < 2.0) { wait_ms(10); if (V.bpm_lit && !last) on++; last = V.bpm_lit; }
+      double sp = tw_s() - t0;
+      printf("[%8.3f]    the word BPM, stopped at 120: %d blinks in %.2f s\n", tw_s(), on, sp);
+      EXPECT(abs(on - (int)(sp * 2.0 + 0.5)) <= 1, "the word BPM at 120 BPM: %d blinks in %.2f s (a beat each: 2 a second)", on, sp);
       tap(B_PLAY); wait_ms(200);
       int ok = 0, all = 0, green = 0, shot_lit = 0;
       for (int i = 0; i < 250; i++) { wait_ms(10); if (!Q.playing) continue; all++;

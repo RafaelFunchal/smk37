@@ -257,15 +257,38 @@ int key_down(uint32_t c) { (void)c; return 0; }
 uint32_t tw_btn, tw_keys; int tw_enc[7]; uint8_t tw_led[41];
 static uint32_t btn_seen, keys_seen; static int steps;
 void panel_init(void) { }
-int panel_step(void) { adv(60000); return ++steps % 11 == 0; }
+/* the panel's edges latched as the hardware's scan does (hal/smk37/panel.c, hal/fm1/panel.c): sampled at every
+ * panel_step (the main loop calls it in each pass, a save's too), kept until read. A press and its release both
+ * inside one save are both seen once the save is over, as on the unit (compared only when read, they cancelled out) */
+#if BOARD_SMK37
+static uint32_t btn_smp, btn_pr, btn_rel, keys_smp, keys_pr, keys_rel;
+extern uint32_t tw_xbtn; static uint32_t xb_smp, xb_pr, xb_rel;
+static void tw_latch(void)
+{
+    uint32_t b = tw_btn, k = tw_keys, x = tw_xbtn;
+    btn_pr |= b & ~btn_smp; btn_rel |= btn_smp & ~b; btn_smp = b;
+    keys_pr |= k & ~keys_smp; keys_rel |= keys_smp & ~k; keys_smp = k;
+    xb_pr |= x & ~xb_smp; xb_rel |= xb_smp & ~x; xb_smp = x;
+}
+#endif
+int panel_step(void) {
+#if BOARD_SMK37
+    tw_latch();                                              /* (the SMK-37's twin: latched; the FM-1's as it was) */
+#endif
+    adv(60000); return ++steps % 11 == 0; }
 void panel_dark(void) { }
 void panel_ticking(void) { }
 void panel_tick(void) { }
 void panel_glow_us(int us) { (void)us; }
 uint32_t panel_keys(void) { return tw_keys; }
 uint32_t panel_buttons(void) { return tw_btn; }
+#if BOARD_SMK37
+uint32_t panel_key_edges(uint32_t *rel) { tw_latch(); uint32_t p = keys_pr; *rel = keys_rel; keys_pr = keys_rel = 0; keys_seen = tw_keys; return p; }
+uint32_t panel_button_edges(uint32_t *rel) { tw_latch(); uint32_t p = btn_pr; *rel = btn_rel; btn_pr = btn_rel = 0; btn_seen = tw_btn; return p; }
+#else   /* (the FM-1's twin: compared when read, as before; its firmware is kept as it is: tests/fm1-reference.sha256) */
 uint32_t panel_key_edges(uint32_t *rel) { uint32_t p = tw_keys & ~keys_seen; *rel = keys_seen & ~tw_keys; keys_seen = tw_keys; return p; }
 uint32_t panel_button_edges(uint32_t *rel) { uint32_t p = tw_btn & ~btn_seen; *rel = btn_seen & ~tw_btn; btn_seen = tw_btn; return p; }
+#endif
 int panel_enc_take(int e) { int v = tw_enc[e]; tw_enc[e] = 0; return v; }
 void panel_led(int id, int on) { if (id >= 0 && id < 41) tw_led[id] = (uint8_t)on; }
 uint8_t tw_glow[41]; uint32_t tw_glow_offs;
@@ -405,7 +428,7 @@ int tw_vel_mode;
 void smk_vel_mode(int mode) { tw_vel_mode = mode; }
 int smk_ext_take(void) { return ext_r == ext_w ? -1 : extq[ext_r++ & 63]; }
 uint32_t smk_xbuttons(void) { return tw_xbtn; }
-uint32_t smk_xbutton_edges(uint32_t *rel) { uint32_t p = tw_xbtn & ~tw_xbtn_seen; *rel = tw_xbtn_seen & ~tw_xbtn; tw_xbtn_seen = tw_xbtn; return p; }
+uint32_t smk_xbutton_edges(uint32_t *rel) { tw_latch(); uint32_t p = xb_pr; *rel = xb_rel; xb_pr = xb_rel = 0; tw_xbtn_seen = tw_xbtn; return p; }
 void smk_xled(int sb, int on) { if (sb >= 0 && sb < 19) tw_xled[sb] = (uint8_t)on; }
 int smk_fader(int i) { return i >= 0 && i < 4 ? tw_fader[i] : -1; }
 float smk_bend(void) { return tw_bend; }
