@@ -21,12 +21,17 @@ const put16 = (a, i, v) => { a[i] = v & 255; a[i + 1] = v >> 8 & 255; };
 const put32 = (a, i, v) => { for (let k = 0; k < 4; k++) a[i + k] = v >>> (8 * k) & 255; };
 const get16 = (a, i) => a[i] | a[i + 1] << 8;
 /* the package: header (64 bytes), the entries (80 each) from 0x40, flash.bin at 0x400; with `ota` (SLOOP 3's update
- * loader, build/upd/ota.bin) a second entry after flash.bin, type 100: SLOOP 2.8 keeps it and restarts into it */
-function buildPackage(area, key, ota) {
+ * loader, build/upd/ota.bin) a second entry after flash.bin, type 100: SLOOP 2.8 keeps it and restarts into it.
+ * `tail` ({ at, bytes }): data written after the area IN CLEAR at flash address `at` (the SMK-37's piano bank, read
+ * through the window's plain range); flash.bin then reaches its end, the sectors between left blank */
+function buildPackage(area, key, ota, tail) {
   const FIRST = 0x4000, SECTOR = 0x1000, AT = 0x400;
-  const size = FIRST + Math.ceil(area.length / SECTOR) * SECTOR;
+  const end = tail ? tail.at + tail.bytes.length : FIRST + area.length;
+  if (tail && tail.at < FIRST + area.length) throw new Error('the tail overlaps the area');
+  const size = Math.ceil(end / SECTOR) * SECTOR;
   const flash = new Uint8Array(size).fill(0xFF);
   flash.set(encArea(area, key), FIRST);
+  if (tail) flash.set(tail.bytes, tail.at);
   const otaAt = AT + size, n = ota ? 2 : 1;
   const pkg = new Uint8Array(otaAt + (ota ? ota.length : 0)).fill(0);
   pkg.set(flash, AT);
@@ -50,14 +55,14 @@ function buildPackage(area, key, ota) {
 }
 /* the checks m-bootloader makes before writing (its midi_update.c), and SLOOP 3's update loader (upd/upd_core.c),
  * made here first */
-function checkPackage(p, key) {
+function checkPackage(p, key, maxSize = 0x7A000) {
   const h = p.pkg.slice(0, 64); enc(h, 0, 64, 0xFFFF);
   if (crc16(h.subarray(2, 64)) !== get16(h, 0)) return 'header';
   const n = get16(h, 8);
   if (n < 1 || n > 11 || crc16(p.pkg.subarray(0x40, 0x40 + 80 * n)) !== get16(h, 2)) return 'list';
   const e = p.pkg.slice(0x40, 0x40 + 80); enc(e, 0, 80, 0xFFFF);
   const off = e[8] | e[9] << 8 | e[10] << 16 | e[11] << 24, size = e[12] | e[13] << 8 | e[14] << 16 | e[15] << 24;
-  if (get16(e, 0) !== 0 || size % 0x1000 || size <= 0x5000 || size > 0x7A000) return 'entry';
+  if (get16(e, 0) !== 0 || size % 0x1000 || size <= 0x5000 || size > maxSize) return 'entry';
   if (crc16(p.pkg.subarray(off, off + size)) !== get16(e, 4)) return 'crc';
   const r = p.pkg.slice(off + 0x4000, off + 0x4000 + 32); enc(r, 0, 32, key);
   if (crc16(r.subarray(2, 32)) !== get16(r, 0)) return 'key';

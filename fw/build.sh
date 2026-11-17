@@ -60,6 +60,13 @@ python3 tools/mkfw.py $O/app.bin $O/fw.area assets/samples.bin
 test $(stat -c%s $O/fw.area) -le $((0x78000 - 0x4000)) || { echo "the area would run into your FM6 bank and SYN kits (0x78000, app/xbank.h)"; exit 1; }
 "$TC/llvm-size" $O/ram.elf | tail -1
 # the installer page: through m-bootloader's MIDI MODE only (3.3.1: the way straight from SLOOP 2.8 is gone)
+if [ $BOARD = smk37 ]; then
+  # the SMK-37's: the piano bank too (tools/mkpiano.py: flash 0x78000 .. below 0xC0000, in clear)
+  python3 tools/mkpiano.py --out $O/piano.img
+  python3 tools/mkpage.py $O/fw.area "3.3.7" $O/installer-smk37.html smk37 $O/piano.img
+  node tests/install_sim.js $O/installer-smk37.html $O/fw.area smk37 $O/piano.img | tail -1
+  echo "SMK-37: $O/installer-smk37.html"; exit 0
+fi
 python3 tools/mkpage.py $O/fw.area "3.3.7" $O/installer-fm1.html
 python3 tools/mkeditor.py web/editor.html > /dev/null
 cp web/editor.html $O/editor-sloop3.html

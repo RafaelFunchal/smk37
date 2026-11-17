@@ -4,7 +4,11 @@
  * checks it makes, and the area it would write, decrypted with the chip key and compared with build/fw/fw.area. Then a FM-1 running a firmware: the page says to start m-bootloader's menu.
  *   node tests/install_sim.js PAGE.html AREA */
 const fs = require('fs');
-const [page, areaFile] = process.argv.slice(2);
+/* node tests/install_sim.js PAGE.html AREA [BOARD [PIANO]] [--wrong-unit]: BOARD smk37 (its page, its piano bank);
+ * --wrong-unit: the other board's unit answers: the page must refuse it, with nothing sent to write */
+const args = process.argv.slice(2), wrong = args.includes('--wrong-unit'), pos = args.filter(a => a !== '--wrong-unit');
+const [page, areaFile] = pos, BOARD = pos[2] || 'fm1', SMK = BOARD === 'smk37';
+const PIANO = SMK ? require('fs').readFileSync(pos[3]) : null;
 const html = fs.readFileSync(page, 'utf8');
 const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
 const AREA = fs.readFileSync(areaFile);
@@ -50,7 +54,10 @@ function frame(cmd, body) {
 function unpack(d) { const o = []; let acc = 0, bits = 0; for (const b of d) { acc |= (b & 127) << bits; bits += 7; if (bits >= 8) { o.push(acc & 255); acc >>= 8; bits -= 8; } } return o; }
 
 const KEY = 0x980F;
-const mb = { pending: null, got: new Map() };
+const mb = { pending: null, got: new Map(), installed: false };
+/* the unit's flash, as command 0x23 reads it: an SMK-37 has its calibration's marker at 0xC1224 */
+const unitSmk = SMK !== wrong, flash = new Uint8Array(0x100000).fill(0xFF);
+if (unitSmk) Buffer.from('trimdat\0').copy(flash, 0xC1224);
 function read(addr, len) {                                 /* one 0x30 request, its answer back as a promise */
   return new Promise(res => {
     mb.pending = res;
@@ -59,7 +66,7 @@ function read(addr, len) {                                 /* one 0x30 request, 
   });
 }
 mb.rx = d => {
-  if (d.length === 6 && d[4] === 0x7F) { install(); return; }
+  if (d.length === 6 && d[4] === 0x7F) { mb.installed = true; if (!wrong) install(); return; }
   const m = unpack(d.slice(1, d.length - 1));
   if (m[2] === 0x12) {
     const body = new Array(48).fill(0);
@@ -68,6 +75,9 @@ mb.rx = d => {
     body[10] = 0; body[11] = 0; body[12] = 0x10; body[13] = 0;
     'v1.2'.split('').forEach((c, i) => body[28 + i] = c.charCodeAt(0));
     mb.toPage(frame(0x12, body));
+  } else if (m[2] === 0x23) {                              /* a raw read: the 8 bytes, then the flash */
+    const a = rd32(m, 7), n = m[11] | m[12] << 8 | m[13] << 16;
+    mb.toPage(frame(0x23, [...m.slice(6, 14), ...flash.slice(a, a + n)]));
   } else if (m[2] === 0x30 && mb.pending) { const r = mb.pending; mb.pending = null; r(m.slice(14, m.length - 1)); }
 };
 async function install() {
@@ -82,26 +92,42 @@ async function install() {
   const fb = new Uint8Array(size);
   for (let o = 0; o < size; o += 512) fb.set((await read(at + o, Math.min(512, size - o))).slice(0, Math.min(512, size - o)), o);
   check(crc16(fb) === rd16(e, 4), 'flash.bin CRC');
-  check(size <= 0x78000, 'flash.bin ends before 0x78000 (SLOOP 3\'s FM6 bank and SYN kits, then its projects)');
+  if (SMK) check(size <= 0xC0000, 'flash.bin ends before 0xC0000 (the SMK-37\'s Bluetooth pairing and calibration)');
+  else check(size <= 0x78000, 'flash.bin ends before 0x78000 (SLOOP 3\'s FM6 bank and SYN kits, then its projects)');
   /* the area as m-bootloader writes it: decrypted line by line with the chip key */
   const a = fb.slice(0x4000, 0x4000 + AREA.length);
   for (let q = 0; q < a.length; q += 32) enc(a, q, Math.min(32, a.length - q), KEY ^ ((q >> 2) & 0xFFFF));
   check(Buffer.compare(Buffer.from(a), AREA) === 0, 'the decrypted area is fw.area');
-  for (let i = 0x4000 + AREA.length; i < size; i++) if (fb[i] !== 0xFF) { check(false, 'padding'); break; }
+  const tailAt = SMK ? 0x78000 : size;
+  for (let i = 0x4000 + AREA.length; i < tailAt; i++) if (fb[i] !== 0xFF) { check(false, 'padding'); break; }
+  if (SMK) {
+    check(Buffer.compare(Buffer.from(fb.slice(0x78000, 0x78000 + PIANO.length)), PIANO) === 0, 'the piano bank at 0x78000, in clear');
+    for (let i = 0x78000 + PIANO.length; i < size; i++) if (fb[i] !== 0xFF) { check(false, 'padding after the piano'); break; }
+  }
   await read(0xF0000000, 8);
   setTimeout(() => {
-    check(logs.some(l => /Installed! The FM-1 restarts on SLOOP 3/.test(l)), 'the page says it is installed');
+    check(logs.some(l => (SMK ? /Installed! The SMK-37 restarts on SLOOP 3/ : /Installed! The FM-1 restarts on SLOOP 3/).test(l)), 'the page says it is installed');
     check(els.st5.className === 'done' && els.st6.className === 'done', 'steps 5 and 6 marked done');
     check(!els.p6.classList.contains('hide') && els.p5.classList.contains('hide'), 'the last pane shown');
     console.log(fails ? fails + ' FAILED' : `install_sim: OK (${size} bytes of flash.bin, area ${AREA.length})`);
     process.exit(fails ? 1 : 0);
   }, 50);
 }
-plug('ota-FM-1_900', mb);                                  /* (m-bootloader 2.3's MIDI MODE answers as M-VAVE's update loaders) */
+plug(SMK ? 'ota-SMK-37 Pro_900' : 'ota-FM-1_900', mb);                                  /* (m-bootloader 2.3's MIDI MODE answers as M-VAVE's update loaders) */
 (async () => {
   await els.con.onclick();
   await new Promise(r => setTimeout(r, 200));
   check(logs.some(l => /m-bootloader v1.2/.test(l)), 'identity read: ' + logs.join(' | '));
+  if (wrong) {                                              /* the other board's unit: refused, nothing written */
+    await new Promise(r => setTimeout(r, 300));
+    els.haveBak.checked = true; els.haveBak.onchange(); if (els.go.onclick) els.go.onclick();
+    await new Promise(r => setTimeout(r, 100));
+    check(!mb.installed, 'the other board\'s unit: no install started');
+    check(logs.some(l => /not an SMK-37|is an SMK-37/.test(l)), 'the page says why: ' + logs.slice(-2).join(' | '));
+    console.log(fails ? fails + ' FAILED' : `install_sim: OK (${BOARD} page refuses the other board's unit)`);
+    process.exit(fails ? 1 : 0);
+  }
+  await new Promise(r => setTimeout(r, 300));             /* (the board's check: two raw reads) */
   check(els.go.disabled, 'Install waits for a backup');
   els.haveBak.checked = true; els.haveBak.onchange();
   check(!els.go.disabled, 'Install enabled');

@@ -361,6 +361,9 @@ footer a{color:var(--ink2)}
 <script>
 __FWPKG__
 const AREA = Uint8Array.from(atob("__AREA__"), c => c.charCodeAt(0));
+/* the board this page installs for (tools/mkpage.py): "fm1", or "smk37" with its piano bank (flash 0x78000, in clear) */
+const BOARD = "__BOARD__", SMK = BOARD === "smk37";
+const PIANO = SMK ? Uint8Array.from(atob("__PIANO__"), c => c.charCodeAt(0)) : null;
 const VERSION = "__VERSION__";
 const W = typeof window !== 'undefined' ? window : {};
 /* ---------------------------------------------------------------- the words (English, French) */
@@ -374,6 +377,7 @@ en: {
   runningFix: 'Switch it off, then on while holding PLAY, choose MIDI MODE, press PLAY. It is found automatically. No menu? Set up m-bootloader (step 2).',
   found: 'FM-1 found: ', reading: '. Reading the chip key...', notmb: 'This is not m-bootloader answering. Nothing is sent.',
   mb: 'm-bootloader ', stage: ' (RAM stage)', key: ', chip key 0x', badpkg: 'The package does not check out ({e}). Nothing is sent.',
+  notSmk: 'This is not an SMK-37 (no SMK-37 calibration in its flash): this page is the SMK-37\'s. Nothing is written.', notFm1: 'This keyboard is an SMK-37 (its calibration is in the flash): this page is the FM-1\'s. Use the SMK-37 installer. Nothing is written.',
   fwready: 'Connected. SLOOP 3 is ready for this FM-1 ({n} bytes, encrypted for its chip).',
   devMeta: 'm-bootloader {v} · chip key {k} · flash {f}',
   noans: 'The FM-1 does not answer.', noansFix: 'Switch it off, then on while holding PLAY, choose MIDI MODE, and click Connect again.',
@@ -398,6 +402,7 @@ fr: {
   runningFix: 'Éteins-le, puis rallume-le en tenant PLAY, choisis MIDI MODE, appuie sur PLAY. Il sera trouvé tout seul. Pas de menu ? Installe m-bootloader (étape 2).',
   found: 'FM-1 trouvé : ', reading: '. Lecture de la clé de la puce...', notmb: 'Ce n\'est pas m-bootloader qui répond. Rien n\'est envoyé.',
   mb: 'm-bootloader ', stage: ' (en RAM)', key: ', clé de la puce 0x', badpkg: 'Le paquet n\'est pas valide ({e}). Rien n\'est envoyé.',
+  notSmk: 'Ce n\'est pas un SMK-37 (pas de calibration de SMK-37 dans sa flash) : cette page est celle du SMK-37. Rien n\'est écrit.', notFm1: 'Ce clavier est un SMK-37 (sa calibration est dans la flash) : cette page est celle du FM-1. Utilise l\'installateur du SMK-37. Rien n\'est écrit.',
   fwready: 'Connecté. SLOOP 3 est prêt pour ce FM-1 ({n} octets, chiffrés pour sa puce).',
   devMeta: 'm-bootloader {v} · clé de la puce {k} · flash {f}',
   noans: 'Le FM-1 ne répond pas.', noansFix: 'Éteins-le, puis rallume-le en tenant PLAY, choisis MIDI MODE, et clique de nouveau sur Connecter.',
@@ -516,7 +521,7 @@ function refresh() {
   if ($('n3')) $('n3').disabled = state !== 'ready';
   if ($('n4')) $('n4').disabled = !(bakOk || $('haveBak').checked) || busy();
   if ($('go')) $('go').disabled = state !== 'ready' || !(bakOk || $('haveBak').checked);
-  if ($('sumDev') && key >= 0) $('sumDev').textContent = 'FM-1 · ' + fmt(T.devMeta, devInfo);
+  if ($('sumDev') && key >= 0) $('sumDev').textContent = (SMK ? 'SMK-37 · ' : 'FM-1 · ') + fmt(T.devMeta, devInfo);
   if ($('sumBak')) $('sumBak').textContent = bakOk ? fmt(T.bakFile, { n: bakName }) : ($('haveBak') && $('haveBak').checked ? T.bakNone : '—');
 }
 let mbOk = false, bakOk = false, bakName = '';
@@ -565,16 +570,44 @@ function onMsg(e) {
     key = m[14] | m[15] << 8; cap = le32(m, 16) || 0x100000;
     const ver = ascii(m, 6 + 28);
     log(T.mb + ver + (m[12] === 2 ? T.stage : '') + T.key + key.toString(16).toUpperCase().padStart(4, '0'), 'ok');
-    pk = buildPackage(AREA, key);
-    const bad = checkPackage(pk, key);
+    pk = buildPackage(AREA, key, null, SMK ? { at: 0x78000, bytes: PIANO } : null);
+    const bad = checkPackage(pk, key, SMK ? 0xC0000 : 0x7A000);
     if (bad) { problem('err3', fmt(T.badpkg, { e: bad }), ''); state = 'idle'; return; }
+    state = 'board';                                     /* the keyboard's model, read before anything else (below) */
+    boardCheck().then(ok => {
+      if (state !== 'board') return;
+      if (!ok) { problem('err3', SMK ? T.notSmk : T.notFm1, ''); state = 'idle'; return; }
+      ready(ver);
+    });
+  }
+  else if (m[2] === 0x30 && state === 'install') onRead(m);
+  else if (m[2] === 0 && state === 'install') {
+    problem('err5', fmt(T.refused, { c: m[6] }) + (served <= total + 32 ? T.intact : ''), T.refusedFix);
+    state = 'idle'; releaseWake(); show('iprog', false); refresh(); if ($('b5')) $('b5').disabled = false;
+  }
+}
+/* the model, from the flash (read only, command 0x23): an SMK-37 has its calibration's marker "trimdat" at 0xC1224
+ * (or m-bootloader's copy of it, "TRIMCOPY", at 0xFF000); an FM-1 has neither (m-bootloader docs/SPEC.md 8.1: strong
+ * evidence). An FM-1's firmware on an SMK-37 would drive its key rows; an SMK-37's on an FM-1 its MIDI pins */
+async function boardCheck() {
+  const at = async (a, s) => { try { const m = await read23(a, 8); return le32(m, 7) === a && String.fromCharCode(...m.slice(14, 14 + s.length)) === s; } catch (e) { return null; } };
+  const trim = await at(0xC1224, 'trimdat\0'), copy = trim ? true : await at(0xFF000, 'TRIMCOPY');
+  if (trim === null || (!trim && copy === null)) return false;         /* (no answer: nothing written) */
+  const smk = !!(trim || copy);
+  return smk === SMK;
+}
+function ready(ver) {
+  {
     total = pk.size;
     devInfo = { v: ver || '?', k: key.toString(16).toUpperCase().padStart(4, '0'), f: Math.round(cap / 1024) + (lang === 'fr' ? ' Ko' : ' KB') };
     if ($('devMeta')) $('devMeta').textContent = fmt(T.devMeta, devInfo);
     show('waiting', false); show('device', true); show('err3', false);
     say(fmt(T.fwready, { n: AREA.length }), 'ok');
     state = 'ready'; refresh();
-  } else if (m[2] === 0x30 && state === 'install') {      /* the unit reads the package */
+  }
+}
+function onRead(m) {
+  {                                                      /* the unit reads the package */
     const addr = le32(m, 7), len = m[11] | m[12] << 8 | m[13] << 16;
     if (addr === FINISH) {
       answer(m, new Array(len).fill(0));
@@ -597,9 +630,6 @@ function onMsg(e) {
       const ph = served <= check ? 1 : f < 0.985 ? 2 : 3;
       if (ph !== lastPh) { lastPh = ph; phase(ph); log((ph === 1 ? T.check : T.write) + '...'); }
     }
-  } else if (m[2] === 0 && state === 'install') {
-    problem('err5', fmt(T.refused, { c: m[6] }) + (served <= total + 32 ? T.intact : ''), T.refusedFix);
-    state = 'idle'; releaseWake(); show('iprog', false); refresh(); if ($('b5')) $('b5').disabled = false;
   }
 }
 let lastPh = 0, hintT = 0;
@@ -609,7 +639,8 @@ function attach(o, i) {
 }
 /* m-bootloader's MIDI MODE: "FM-1 Update" until 2.2; from 2.3 it answers as M-VAVE's update loaders do,
  * "ota-FM-1_900". Each port that may be it is asked who it is (0x12): the one that says MBOOT is used */
-const UPD = /FM-1 Update|ota-FM-1/i;
+/* the SMK-37's: "SMK-37 Update" or "ota-SMK-37 Pro_900" (the bare "ota-SMK-37_9xx" is another updater: never it) */
+const UPD = SMK ? /SMK-37 Update|ota-SMK-37 Pro_/i : /FM-1 Update|ota-FM-1/i;
 function candidates() {
   const outs = [...midi.outputs.values()].filter(p => UPD.test(p.name) && p.state !== 'disconnected');
   const ins = [...midi.inputs.values()].filter(p => UPD.test(p.name) && p.state !== 'disconnected');
@@ -640,7 +671,7 @@ $('con').onclick = async () => {
     state = 'waiting'; show('waiting', true); show('device', false); show('err3', false);
     const st = $('status'); st.textContent = ''; st.className = 'status';
     const names = () => [...midi.outputs.values()].map(p => p.name);
-    const firmware = () => names().some(n => /SLOOP|Felucca|CRITICAL|FM-1/i.test(n) && !UPD.test(n));
+    const firmware = () => names().some(n => (SMK ? /SLOOP|Felucca|CRITICAL|SMK-37|SMK37/i : /SLOOP|Felucca|CRITICAL|FM-1/i).test(n) && !UPD.test(n));
     if (firmware()) problem('err3', T.running, T.runningFix);
     clearTimeout(hintT);
     hintT = setTimeout(() => { if (state === 'waiting' && !firmware()) problem('err3', fmt(T.noport, { n: names().join(', ') || '—' }), T.noportFix); }, 8000);
@@ -688,7 +719,7 @@ $('bak').onclick = async () => {
     } catch (e) { if (++tries > 3) { problem('err4', fmt(T.bfail, { a: a.toString(16) }), T.bfailFix); break; } }
   }
   if (a >= cap) {
-    const name = 'fm1-backup-' + key.toString(16).toUpperCase().padStart(4, '0') + '-' + new Date().toISOString().slice(0, 10) + '.bin';
+    const name = (SMK ? 'smk37-backup-' : 'fm1-backup-') + key.toString(16).toUpperCase().padStart(4, '0') + '-' + new Date().toISOString().slice(0, 10) + '.bin';
     const url = URL.createObjectURL(new Blob([img], { type: 'application/octet-stream' }));
     const ln = document.createElement('a'); ln.href = url; ln.download = name; document.body.appendChild(ln); ln.click(); ln.remove && ln.remove();
     bakOk = true; bakName = name; $('bname').textContent = name; show('bdone', true); show('bprog', false);
