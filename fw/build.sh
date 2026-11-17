@@ -3,14 +3,19 @@
 # installs through m-bootloader's MIDI mode.   fw/build.sh [LLVM_BIN]
 set -eu
 TC=${1:-${PI32V2_LLVM:-toolchain/bin}}
-O=build/fw; rm -rf $O; mkdir -p $O/o
-CF="${BOOT_DIAG:+-DBOOT_DIAG} -mcpu=ac791n -O2 -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -Wall -Wextra -Wno-unused-parameter"
-for f in engine/sound.c engine/fx.c engine/common.c engine/va.c engine/drum.c engine/fm.c engine/lofi.c engine/pd.c engine/wheel.c engine/noise.c engine/voice.c engine/trio.c engine/phys.c engine/fm6.c engine/sample.c engine/grain.c engine/trackfx.c engine/texture.c engine/engines.c core/libc.c hal/fm1/audio.c; do
+# BOARD=smk37: the M-VAVE SMK-37 (hal/smk37: its screen, panel, pads, faders, wheels, TRS MIDI OUT; the piano bank),
+# into build/fw-smk37; without it, the FM-1 as always, into build/fw
+BOARD=${BOARD:-fm1}
+case $BOARD in fm1) O=build/fw; BF="";; smk37) O=build/fw-smk37; BF="-DBOARD_SMK37=1";; *) echo "BOARD: fm1 or smk37"; exit 1;; esac
+H=hal/fm1; HB=hal/fm1; [ $BOARD = smk37 ] && HB=hal/smk37
+rm -rf $O; mkdir -p $O/o
+CF="${BOOT_DIAG:+-DBOOT_DIAG}${BF:+ $BF} -mcpu=ac791n -O2 -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -Wall -Wextra -Wno-unused-parameter"
+for f in engine/sound.c engine/fx.c engine/common.c engine/va.c engine/drum.c engine/fm.c engine/lofi.c engine/pd.c engine/wheel.c engine/noise.c engine/voice.c engine/trio.c engine/phys.c engine/fm6.c engine/sample.c engine/grain.c engine/trackfx.c engine/texture.c engine/engines.c core/libc.c hal/fm1/audio.c ${BF:+engine/piano.c}; do
   "$TC/clang" $CF -c $f -o $O/o/$(basename $f .c).o
 done
 # the interface and the projects: small rather than fast (they run between audio blocks, with time to spare); the
 # master bus too (its loops run once a block, on the mix: not per voice); the hardware's drivers
-for f in engine/drumkits.c engine/fm6_patches.c engine/slice.c hal/fm1/irq.c hal/fm1/board.c hal/fm1/cpu1.c hal/fm1/adc.c hal/fm1/panel.c hal/fm1/flash.c hal/fm1/usb.c hal/fm1/uart.c hal/fm1/sys.c \
+for f in engine/drumkits.c engine/fm6_patches.c engine/slice.c hal/fm1/irq.c $HB/board.c hal/fm1/cpu1.c $HB/adc.c $HB/panel.c hal/fm1/flash.c hal/fm1/usb.c $HB/uart.c hal/fm1/sys.c \
          engine/master.c seq/seq.c app/store.c app/harmony.c app/arp.c app/midi.c app/psound.c fw/main.c; do
   "$TC/clang" $(echo "$CF" | sed 's/-O2/-Os/') -c $f -o $O/o/$(basename $f .c).o
 done

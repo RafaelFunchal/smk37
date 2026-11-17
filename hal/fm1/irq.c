@@ -32,7 +32,11 @@ void irq_start(void (*fn)(void))
     for (uint32_t i = 0; i < 32u; i++) REG32(0x1EEF100u + 4u * i) = 0;   /* every source off */
     ILAT_CLR = 0xFFu;
     tick_fn = fn;
+#if BOARD_SMK37
+    T5_CON = 0x4000u; T5_CNT = 0; T5_PRD = 600u;                        /* SMK-37: 6 MHz / 600, 10 kHz (a column a tick) */
+#else
     T5_CON = 0x4000u; T5_CNT = 0; T5_PRD = 1500u;                       /* 6 MHz / 1500: 4 kHz */
+#endif
     VEC[IRQ_TIMER5] = (uint32_t)(uintptr_t)isr_tick;
     uint32_t sh = (IRQ_TIMER5 & 7u) * 4u;
     ICFG(IRQ_TIMER5) = (ICFG(IRQ_TIMER5) & ~(0xFu << sh)) | (((1u << 1) | 1u) << sh);   /* on, priority 1 */

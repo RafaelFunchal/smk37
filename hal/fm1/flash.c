@@ -176,8 +176,14 @@ int flash_read(uint32_t a, void *dst, uint32_t n)
     if (!was) xip_on();                                       /* (the window as it was) */
     return 0;
 }
+#if BOARD_SMK37
+#include "../smk37/smk37.h"               /* (the one range the SMK-37 build may write: smk_flash_writable) */
+#endif
 int flash_erase_start(uint32_t a)
 {
+#if BOARD_SMK37
+    if (!smk_flash_writable(a, 4096u)) return -1;
+#endif
     if (!capacity || (a & 4095u) || a >= capacity || flash_busy()) return -1;
     xip_off();                                                /* (off until flash_busy sees it done) */
     wren(); command(0x20); addr24(a); cs(1);
@@ -186,6 +192,9 @@ int flash_erase_start(uint32_t a)
 int flash_program_start(uint32_t a, const void *src, uint32_t n)
 {
     const uint8_t *p = (const uint8_t *)src;
+#if BOARD_SMK37
+    if (!smk_flash_writable(a, n)) return -1;
+#endif
     if (!capacity || !n || (a & 255u) + n > 256u || a + n > capacity || flash_busy()) return -1;
     xip_off();
     wren(); command(0x02); addr24(a);
