@@ -1,0 +1,11 @@
+The PIANO engine's sound bank (assets/erik37.bank, trimmed into the SMK-37 package by tools/mkpiano.py)
+
+Piano samples: "Salamander Grand Piano V3" by Alexander Holm, CC BY 3.0
+  https://creativecommons.org/licenses/by/3.0/
+  source: https://archive.org/details/SalamanderGrandPianoV3
+
+The bank is Erik37's (github.com/genkigenki/erik37, by M. Geisler): 18 of the notes in 3 velocity layers, encoded as
+block ADPCM, looped after the attack, with key-by-key decay data. For SLOOP 3 on the SMK-37 it was changed again: the
+lowest zone dropped (its keys play the next zone pitched down) and 2 of the 3 velocity layers kept (soft and loud,
+crossfaded), to fit the SMK-37's flash. The bank is a derivative of the recording and stays under CC BY 3.0.
+The engine's code (engine/piano.c, erk_bank.h, erk_codec.h) is Erik37's, MPL-2.0.
