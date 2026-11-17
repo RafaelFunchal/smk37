@@ -1,0 +1,39 @@
+# SLOOP 3 on the M-VAVE SMK-37: the port's decisions (fm1-to-smk37's setup file). The mapping follows SLOOP Pro's
+# (isod89/sloop-pro smk37-port.yaml, approved by SLOOP's author), adapted to SLOOP 3's five tracks.
+firmware:
+  name: SLOOP 3
+  upstream: https://github.com/isod89/sloop3-fm1
+  base: SLOOP 3.3.7 (915b54f)
+  board_layer: by hand (SLOOP 3 is new code), from fm1-to-smk37 docs/01-hardware.md and SLOOP Pro's hal/smk_input.h
+  lost_on_smk: [TRS MIDI IN, SLOOP 2.8 import, USR2-4 sample slots]
+  added_on_smk: [PIANO engine (Erik37, MPL-2.0; Salamander Grand V3, CC BY 3.0), TRS MIDI OUT]
+install: m-bootloader MIDI MODE only (installer-smk37.html); the model read from the flash (trimdat at 0xC1224) first
+models: [pro, elite, mke]   # one build: m-bootloader writes it the same way on each
+data_family: SLOOP 3's own store, moved above the calibration (0xC2000-0xF3FFF), out of an install's reach
+keys:
+  middle: fm1                # keybed 5..31 = F3..G5, velocity from the factory curves
+  outer: extend              # keys 27..36 through the track's scale / chords / arp
+  outer_drums: { C3: KICK, D3: SNARE, E3: HAT, G#5: BELL, A5: OPEN, B5: CRASH, C6: RIDE }
+  velocity: factory
+pads:
+  pattern: white_keys        # the FM-1's 16 white keys, reading order (top 1-8, bottom 9-16)
+  colours: track
+  drum_pads: KNOB BANK       # the pads play the kit whatever track the keys play
+faders:
+  takeover: soft
+  bank_button: FADER BANK
+  banks:
+    A: [level 1, level 2, level 3, level 4]
+    B: [filter 1, filter 2, filter 3, filter 4]
+    C: [reverb 1, reverb 2, reverb 3, reverb 4]
+    D: [delay 1, delay 2, delay 3, delay 4]
+    E: [drums level, drums filter, drums reverb, drums delay]
+wheels: { pitch: bend (the selected synth track, BEND setting), mod: vibrato, calibration: auto }
+knobs: { K1: master, K2: select, K3: algorithm, K4: presets, K5-K8: knob 1-4 }
+buttons:
+  map: printed               # PATCH=HOME BT=SAVE SCALE=SEL CHORD=ENV NOTE REPEAT=LFO PARA=EDIT GLOBE=GLO
+  extra: { KNOB BANK: drum pads, FADER BANK: fader banks, "<": previous track / step page, ">": next track / step page }
+pedal: sustain
+open_questions:
+  - on a unit: pad threshold, encoder direction, the piano's CPU load with 24 voices
+  - a KEY VELOCITY setting and the pads' settings in the menu

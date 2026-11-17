@@ -100,7 +100,11 @@ static const uint8_t CONF[CONF_LEN] = {
     7, 0x25, 1, 0x01, 0, 0, 0 };                                 /*   its rate can be set */
 _Static_assert(sizeof CONF == CONF_LEN, "the configuration's length");
 static const uint8_t LANG[4] = { 4, 3, 0x09, 0x04 };
+#if BOARD_SMK37
+static const char NAME[] = "SMK-37 SLOOP 3";          /* (the web editor looks for "SLOOP 3") */
+#else
 static const char NAME[] = "FM-1 SLOOP 3";
+#endif
 #endif
 
 /* the controller's DMA writes a little past a full packet when it receives: room to spare */

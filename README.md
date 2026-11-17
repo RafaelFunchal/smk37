@@ -17,6 +17,8 @@ can go back at any time with the backup the installer makes.
 
 ![The screens of SLOOP 3: tracks, sounds, drums, the piano roll, the punch-in effects, a visualiser](docs/screens.png)
 
+**M-Vave SMK-37:** see [SMK-37 instructions](SMK37.md) (with a sampled grand piano).
+
 **[Install it from your browser →](https://isod89.github.io/sloop3-fm1/)** (Chrome or Edge, a USB data cable, through
 m-bootloader)
 
