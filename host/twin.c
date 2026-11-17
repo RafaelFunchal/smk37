@@ -2288,6 +2288,10 @@ static void sc_smk(void)
     tw_pad(3, 90); wait_ms(60); shot("smk-panel-test"); tw_pad(3, 0); wait_ms(60);
     lr_together();
     EXPECT(sticky == pg0, "< > a third time: not back (%d, was %d)", sticky, pg0);
+    /* HOME > SCREEN > TEXT: LARGE (kept with the project, sc_smk_reboot) */
+    m = msg_mark(); home_knob(1, 2, 1); wait_ms(100);
+    EXPECT(ui_large == 1 && said_since(m, "TEXT: LARGE"), "HOME > SCREEN > TEXT: not LARGE (%d)", ui_large);
+    shot("smk-large-tracks");
     /* the project saved: only the SMK-37's data range written */
     select_track(t); trk = t;
     save_and_wait();
@@ -2319,6 +2323,7 @@ static void sc_smk_reboot(void)                  /* after sc_smk's flash: the pr
     EXPECT(piano_bank_ok(), "SMK-37: the piano lost");
     int t = synth_trk();
     EXPECT(S.trk[t].patch.engine == ENG_PIANO, "SMK-37: the track's piano not kept (engine %d)", S.trk[t].patch.engine);
+    EXPECT(ui_large == 1, "SMK-37: TEXT LARGE not kept");
     EXPECT(smk_kv == KV_HARD && smk_sens == 2 && smk_light == 1 && smk_krev == 1, "SMK-37: the settings not kept (%d %d %d %d)", smk_kv, smk_sens, smk_light, smk_krev);
     EXPECT(smk_layer == smk_trk_shown(1) && smk_lower == smk_trk_shown(2) && smk_split == 5, "SMK-37: KEYS not kept with the project (layer %d, split's track %d, split %d)", smk_layer, smk_lower, smk_split);
     keydown(9); wait_ms(80);
@@ -2399,6 +2404,9 @@ int main(int argc, char **argv)
     }
     tw_flash_init();
     garble_all();
+#if BOARD_SMK37
+    if (getenv("TWIN_LARGE")) ui_large = 1;               /* (HOME > SCREEN > TEXT LARGE from the start: its screens) */
+#endif
     tw_turn = 0; tw_wake = 0;
     pthread_t th; pthread_create(&th, 0, tw_script, 0);
     app_main(60);

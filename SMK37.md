@@ -81,6 +81,14 @@ the 16 tiles are the pads (their force 0..1023 as a number and a bar, lit while 
 the top line the last key or pad with its velocity, the pitch wheel (W), mod wheel (M) and pedal (P) as raw readings.
 A button or a knob says its printed name (a knob: which way and how far). The keys still play. < and > together: back.
 
+## Larger text
+
+HOME (PATCH) held + SCALE: the settings menu; on its SCREEN page, **TEXT: LARGE** draws the screen's small type a step
+larger (capitals 16 px instead of 13): the knobs' names, the page names, the tiles, the track list, the messages. Kept
+with the project. Where a text has no room for it (the stacked lists of values, a line the large type would push its
+neighbour off), it stays as it was: nothing is cut or overlaps that was not before. TEXT: NORMAL is the screen as
+SLOOP 3 draws it on the FM-1.
+
 ## First install: what to check
 
 After installing, in this order (each step is a minute). If something is off, note what PANEL TEST shows.
