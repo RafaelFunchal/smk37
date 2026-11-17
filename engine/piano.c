@@ -293,7 +293,7 @@ GB_SMALL static void pn_begin(gb_voice *v, const gb_patch *p)
     q->g = q->env * q->amp;                         /* start at the target: keep the hammer's transient */
     q->state = PS_ON;
 }
-/* a note asked for while a save has the flash window off (found on the first SMK-37: a chord played as the autosave
+/* a note asked for while a save has the flash window off (a chord played as the autosave
  * began lost its piano notes): kept waiting, begun as soon as the flash is back (fw/main.c ends an autosave at a key);
  * let go meanwhile, it begins and is let go at once */
 GB_SMALL static void pn_start(gb_voice *v, const gb_patch *p, int fresh)

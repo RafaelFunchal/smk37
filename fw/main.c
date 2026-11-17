@@ -4485,7 +4485,7 @@ int app_main(uint32_t arg)
 #if BOARD_SMK37
         /* (an autosave, and a key or a pad played meanwhile: it stops at once, the flash back within one sector's erase,
          * so the piano's notes begin; the copy it was writing has no header, the last saved one is kept; it is tried
-         * again later. Found on the first SMK-37: a chord played as the autosave began lost its notes) */
+         * again later: a chord played as the autosave began would lose its notes) */
         /* (the UI that takes the keys is flash code: it does not run while the save keeps the window off, so the
          * panel's own count is watched; the abort is flash code too: once the operation under way is over) */
         if (saving && !saving_shown && !saving_snd && !ed_wr.on && smk_hits() != smk_as_hits && !flash_busy()) {
