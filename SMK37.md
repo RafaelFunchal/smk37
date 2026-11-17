@@ -134,8 +134,9 @@ With PADS on CONTROL (the default), on the playing pages the pads are a control 
 - **UP / DOWN**: the next or previous kind of sound (KEYS, BASS, PAD, LEAD... then FAVS and YOURS), its first sound.
 - **LEFT / RIGHT**: the previous or next sound, as PRESETS (K4) does, but the page stays as it is.
 - **SOLO**: the track alone (the others silent); again: all back. Lit while on.
-- **LAYER**: the layer off, and back on as it was (the first time: the next synth track). Lit in the layer's colour while on.
-- **SPLIT**: the split off, and back on as it was (the first time: the next track, below C4). Lit in its colour while on.
+- **LAYER**: the layer off, and back on as it was (the first time: the next synth track). Full in the layer's colour
+  while on, faint in it while off; faint grey (as an empty slot) while none has been chosen yet.
+- **SPLIT**: the split off, and back on as it was (the first time: the next track, below C4). Lit as LAYER is.
 - **TAP**: tap the tempo (two taps or more). Blinks on the beat.
 
 Each press says what it did on the screen. KNOB BANK tapped switches the pads to the drum kit and back.
