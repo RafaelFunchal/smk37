@@ -44,7 +44,7 @@ names for the buttons and K5..K8 for KNOB 1..4.
 | Keys F3..G5 (the middle 27) | the FM-1's 27 keys, **with velocity** from your unit's factory curves |
 | Keys C3..E3 and G#5..C6 (the outer 10) | more notes, through the track's scale, chords and arpeggiator; on the drum track C3 KICK, D3 SNARE, E3 HAT, G#5 BELL, A5 OPEN, B5 CRASH, C6 RIDE |
 | 16 pads | the FM-1's 16 white keys (top row 1-8, bottom 9-16): notes, drums, steps (SEQ), patterns (BT), the mix (GLOBE), HOME's keys; with velocity; lit in the track's colour |
-| KNOB BANK tapped | DRUM PADS on / off: the pads play the drum kit whatever track the keys play (its light on) |
+| KNOB BANK tapped | DRUM PADS on / off: the pads play the drum kit whatever track the keys play (its light on). Saved with the project; also SMK-37 SETTINGS 2/2, PADS |
 | KNOB BANK held + K3 | LAYER: a second synth track every key plays too, the same notes and velocity (OFF, or a track) |
 | KNOB BANK held + K4 | SPLIT's track: what the keys below the split point play (OFF, a synth track, or the drums) |
 | KNOB BANK held + a key | the split point at that key (keys below it go to the SPLIT's track); the same key again: no split |
@@ -67,14 +67,22 @@ Power-on: **OCTAVE-** held, RESCUE (an empty project; yours is kept); **SEQ PLAY
 
 ## SMK-37 SETTINGS and PANEL TEST
 
-Press **<** and **>** together. Saved with the project.
+Press **<** and **>** together. Saved with the project. **K2** turns between its two pages.
+
+**SMK-37 1/2**
 
 | Knob | Setting | |
 |---|---|---|
 | K5 | TOUCH | the keys' and the pads' velocity: DYNAMIC (your unit's factory curves), SOFT, HARD, FIX 64, FIX 100, FIX 127 |
-| K6 | PADS | how firm a pad hit must be: LOW, MID (default), HIGH, MAX. Pads that fire twice or by themselves: higher |
+| K6 | SENS | how firm a pad hit must be: LOW, MID (default), HIGH, MAX. Pads that fire twice or by themselves: higher |
 | K7 | LIGHT | the pads' brightness: 100 %, 50 %, 25 % |
 | K8 | KNOBS | NORMAL, or REVERSE if every knob turns the wrong way on your unit |
+
+**SMK-37 2/2**
+
+| Knob | Setting | |
+|---|---|---|
+| K5 | PADS | NOTES: the pads are the white keys of the track the keys play (and light up with its notes). DRUMS: the pads always play the drum kit, whatever track the keys play, and light only when hit. Tapping KNOB BANK switches the same setting. On the pages where the pads have another job (SEQ's steps, SOUNDS, NOTES, a layer's page) they keep doing it |
 
 **PANEL TEST** (< and > together again) shows every input as the keyboard reads it, and does nothing with the buttons:
 the 16 tiles are the pads (their force 0..1023 as a number and a bar, lit while held), the dials the faders (0..127),
@@ -106,7 +114,7 @@ After installing, in this order (each step is a minute). If something is off, no
 5. **Saving:** BT twice (save), switch off and on: your project comes back.
 6. **Lights:** pads in the track's colour; KNOB BANK's, FADER BANK's and SEQ PLAY's lights.
 
-Settings to try if something is off: knobs backwards, KNOBS REVERSE; pads too eager or too stiff, PADS; velocity too
+Settings to try if something is off: knobs backwards, KNOBS REVERSE; pads too eager or too stiff, SENS; velocity too
 loud or soft, TOUCH. Things worth reporting: a knob or button with the wrong name, a key or pad that never shows, pads
 firing at rest, PEAK near 100 %, the screen or the pads' colours wrong.
 
