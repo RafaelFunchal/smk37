@@ -128,6 +128,9 @@ make test                                        # SLOOP 3's tests
 make twin-smk                                    # the SMK-37 on the PC twin: its scenarios and the FM-1's
 ```
 
+On macOS (or anywhere with Docker), `tools/dev/dev.sh` runs these in a ready Linux container: see
+[tools/dev/README.md](tools/dev/README.md). `tests/fm1-reference.sha256` holds the FM-1 build's hashes it must keep.
+
 `BOARD=smk37` also checks the installer page against a simulated m-bootloader on an SMK-37 and on an FM-1
 (`tests/install_sim.js ... smk37 ... [--wrong-unit]`).
 
