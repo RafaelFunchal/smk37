@@ -490,8 +490,9 @@ COLD static void smk_ctl_lights(void)
             c = used ? tc : 0x808080u; lvl = mine ? 4 : used ? 2 : 1;
             if (held) lvl = ((now - smk_ctl_t[pad]) / (120000u * lsb)) & 1u ? 4 : 1;   /* (held: blinks, to keep it) */
         } else if (pad == PC_SOLO) { c = 0xFFD23Cu; lvl = solo[trk] ? 4 : 1; }
-        else if (pad == PC_LAYER) { int L = smk_layer >= 0 ? smk_layer : smk_layer_park; c = L >= 0 ? smk_rgb(TRK_COL[L]) : 0xFFFFFFu; lvl = smk_layer >= 0 ? 4 : 1; }
-        else if (pad == PC_SPLIT) { int on = smk_split > -100 && smk_lower >= 0, L = on ? smk_lower : smk_lower_park; c = L >= 0 ? smk_rgb(TRK_COL[L]) : 0xFFFFFFu; lvl = on ? 4 : 1; }
+        /* (LAYER, SPLIT: on, full in their track's colour; off, faint in it; none chosen yet, faint grey as an empty slot) */
+        else if (pad == PC_LAYER) { int L = smk_layer >= 0 ? smk_layer : smk_layer_park; c = L >= 0 ? smk_rgb(TRK_COL[L]) : 0x808080u; lvl = smk_layer >= 0 ? 4 : 1; }
+        else if (pad == PC_SPLIT) { int on = smk_split > -100 && smk_lower >= 0, L = on ? smk_lower : smk_lower_park; c = L >= 0 ? smk_rgb(TRK_COL[L]) : 0x808080u; lvl = on ? 4 : 1; }
         else if (pad == PC_TAP) lvl = beat ? 4 : 1;
         else lvl = held ? 4 : 3;                               /* (UP DOWN LEFT RIGHT: brighter than an empty slot) */
         if (held && k < 0) lvl = 4;

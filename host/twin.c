@@ -2204,6 +2204,8 @@ static void sc_smk(void)
 #define PADLVL(p) tw_lvl[14 + white_key[p]]
     smk_pads = PM_CONTROL; wait_ms(100);
     EXPECT(tw_padmode, "PADS CONTROL: the pads not taken as controls");
+    EXPECT(smk_layer < 0 && smk_layer_park < 0 && PADLVL(13) == 1 && tw_padcol[13] == 0x808080u && PADLVL(14) == 1 && tw_padcol[14] == 0x808080u,
+           "LAYER, SPLIT none chosen yet: not faint grey (layer %d %06x, split %d %06x)", PADLVL(13), tw_padcol[13], PADLVL(14), tw_padcol[14]);
     { m = msg_mark(); tw_pad(0, 90); wait_ms(60);
       EXPECT(!sounding(t, 53), "PADS CONTROL: pad 1 played a note");
       tw_pad(0, 0); wait_ms(80);
