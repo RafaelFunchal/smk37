@@ -158,21 +158,7 @@ COLD static void smk_keys_init(void)
     smk_kv = KV_DYNAMIC; smk_sens = 1; smk_light = 0; smk_krev = 0; smk_settings_apply();
 }
 COLD static int smk_kb_held(void) { return (smk_xbuttons() >> SB_KNOB_BANK) & 1u; }
-COLD static const char *smk_trk_name(int t, char *b)              /* "2 PAD SOFT" / "DRUMS" / "OFF" */
-{
-    if (t < 0) return "OFF";
-    if (is_drum(t)) return "DRUMS";
-    char *p = put_u(b, (uint32_t)POS[t] + 1u); p = put_s(p, " ");
-    int pi = preset_of[t]; p = put_s(p, pi >= 0 && pi < gb_npresets ? gb_presets[pi].name : gb_edesc[S.trk[t].patch.engine].name); *p = 0;
-    return b;
-}
-COLD static void smk_keys_say(void)
-{
-    char a[24], c[24], b[64], *p = put_s(b, "LAYER "); p = put_s(p, smk_trk_name(smk_layer, a));
-    p = put_s(p, " · SPLIT "); p = put_s(p, smk_split > -100 && smk_lower >= 0 ? smk_trk_name(smk_lower, c) : "OFF");
-    if (smk_split > -100 && smk_lower >= 0) { p = put_s(p, " < "); p = put_s(p, harm_note_name[((53 + smk_split) % 12 + 12) % 12]); p = put_u(p, (uint32_t)((53 + smk_split) / 12 - 1)); }
-    *p = 0; say(b);
-}
+static uint32_t smk_kb_t;                                    /* (when KNOB BANK went down: held a moment, the KEYS page) */
 COLD static int smk_next_trk(int cur, int d, int drums)           /* OFF, then the tracks in the order shown (synths; the drums if asked) */
 {
     int order[NTRK + 1], n = 0; order[n++] = -1;
@@ -185,8 +171,8 @@ COLD static void smk_keys_setup_knobs(void)
 {
     int dl = panel_enc_take(ENC_ALGORITHM), ds = panel_enc_take(ENC_PRESETS);
     for (int e = 0; e < 7; e++) if (e != ENC_ALGORITHM && e != ENC_PRESETS) (void)panel_enc_take(e);   /* (the others: nothing now) */
-    if (dl) { smk_layer = (int8_t)smk_next_trk(smk_layer, dl > 0 ? 1 : -1, 0); smk_kb_used = 1; smk_keys_say(); }
-    if (ds) { smk_lower = (int8_t)smk_next_trk(smk_lower, ds > 0 ? 1 : -1, 1); if (smk_lower >= 0 && smk_split == -100) smk_split = 7; smk_kb_used = 1; smk_keys_say(); }
+    if (dl) { smk_layer = (int8_t)smk_next_trk(smk_layer, dl > 0 ? 1 : -1, 0); smk_kb_used = 1; }
+    if (ds) { smk_lower = (int8_t)smk_next_trk(smk_lower, ds > 0 ? 1 : -1, 1); if (smk_lower >= 0 && smk_split == -100) smk_split = 7; smk_kb_used = 1; }
 }
 COLD static int smk_keys_setup_key(int k)                    /* 1: the key was the split point's (KNOB BANK held) */
 {
@@ -195,7 +181,6 @@ COLD static int smk_keys_setup_key(int k)                    /* 1: the key was t
     smk_kb_used = 1;
     if (smk_split == pos) smk_split = -100;
     else { smk_split = (int8_t)pos; if (smk_lower < 0) smk_lower = (int8_t)smk_next_trk(-1, 1, 0); }
-    smk_keys_say();
     return 1;
 }
 static void smk_layer_off(int k)
@@ -225,6 +210,26 @@ COLD static void smk_key_on(int k, const uint8_t *n, int nn, float vel, uint32_t
         smk_lay_notes[k][i] = n[i];
         if (arp_on(L)) arp_add(L, n[i], (int)(vel * 127.0f)); else play_on(GB_OWNER(OWN_KEY, 0), L, n[i], vel);
     }
+}
+/* the KEYS on the screen: each pass, which rows the layer and the split play (TRACKS shows them as tags); KNOB BANK held
+ * (a moment, or used), the KEYS page: the layer's and the split's sounds, large, in place of the page (let go: back) */
+COLD static const char *smk_snd_name(int t)                  /* a track's sound: its preset, or its engine; the drums */
+{
+    if (is_drum(t)) return "DRUMS";
+    int pi = preset_of[t]; return pi >= 0 && pi < gb_npresets ? gb_presets[pi].name : gb_edesc[S.trk[t].patch.engine].name;
+}
+COLD static void smk_keys_view(ui_view *v)
+{
+    int sp = smk_split > -100 && smk_lower >= 0;
+    v->keys_layer = (uint8_t)(smk_layer >= 0 && smk_layer < NTRK ? POS[smk_layer] + 1 : 0);
+    v->keys_split = (uint8_t)(sp ? POS[smk_lower] + 1 : 0);
+    v->keys_note = (uint8_t)(sp ? 53 + smk_split : 0);
+    if (!smk_kb_held() || sticky == PG_SMKTEST || v->page == UI_SPLASH) return;
+    if (!smk_kb_used && (uint32_t)(time_ticks() - smk_kb_t) < 300000u * lsb) return;   /* (a tap: DRUM PADS, no page) */
+    v->page = UI_KEYS; v->info = 0;
+    for (int i = 0; i < 4; i++) v->knob[i].label = 0;
+    put_s(v->page_name, smk_layer >= 0 ? smk_snd_name(smk_layer) : "OFF")[0] = 0;   /* (the number: in its box) */
+    put_s(v->sub, sp ? smk_snd_name(smk_lower) : "OFF")[0] = 0;
 }
 /* ---- the SMK-37's pages: SETTINGS (K5..K8), PANEL TEST (< and > together, each in turn, then back) */
 static const char *const SMK_KV_NAME[KV_N] = { "DYNAMIC", "SOFT", "HARD", "FIX 64", "FIX 100", "FIX 127" };
@@ -325,8 +330,9 @@ COLD static void smk_xbtns(void)
         pr &= ~((1u << SB_KNOB_BANK) | (1u << SB_FADER_BANK)); rel &= ~(1u << SB_KNOB_BANK);
     }
     if (pr & (1u << SB_FADER_BANK)) smk_fader_bank((held_btn & (1u << BTN_OCT_DOWN)) ? -1 : 1);
-    if (pr & (1u << SB_KNOB_BANK)) smk_kb_used = 0;
-    if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used) { smk_drumpads = (uint8_t)!smk_drumpads; smk_drumpads_say(); }   /* (kept with the project) */
+    if (pr & (1u << SB_KNOB_BANK)) { smk_kb_used = 0; smk_kb_t = time_ticks(); }
+    /* (a tap: DRUM PADS on or off, kept with the project; held long enough for the KEYS page, only looked at: nothing) */
+    if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used && (uint32_t)(time_ticks() - smk_kb_t) < 300000u * lsb) { smk_drumpads = (uint8_t)!smk_drumpads; smk_drumpads_say(); }
     {   /* < and > together: the SMK-37's pages; alone, each acts when let go (the first of a pair does nothing) */
         static uint8_t combo;
         const uint32_t LR = (1u << SB_LEFT) | (1u << SB_RIGHT);

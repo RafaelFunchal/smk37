@@ -98,6 +98,7 @@ static uint8_t smk_kv, smk_sens, smk_light, smk_krev;   /* (fw/smk.inc: the SMK-
 static uint8_t smk_drumpads;                       /* (fw/smk.inc: PADS PLAY DRUMS, KNOB BANK's too: kept with the project) */
 static void smk_settings_apply(void);
 static void smk_view(ui_view *v, int pg);
+static void smk_keys_view(ui_view *v);
 static void smk_page_knobs(void);
 static void smk_test_buttons(void);
 static uint64_t smk_sus_keys;
@@ -1672,6 +1673,9 @@ COLD static int ui_step(void)
         t_pass = now;
         uint8_t *z = (uint8_t *)&W; for (uint32_t i = 0; i < sizeof W; i++) z[i] = 0;   /* (the padding too) */
         fill_view(&W);
+#if BOARD_SMK37
+        smk_keys_view(&W);                                   /* (the KEYS: the rows' tags; KNOB BANK held, their page) */
+#endif
         if (W.page == UI_SPLASH) {                           /* the start's logo: a picture each pass */
             { uint16_t c[5]; for (int t = 0; t < NTRK; t++) c[POS[t]] = TRK_COL[t]; vis_splash((now - splash_t0) / lsb / 1000u, 0, c);   /* (3.3: the logo alone; the version is in HOME) */ } V = W; gen_drawn = msg_gen; tile_i = 0;
         } else if (W.page == UI_VIS) {                       /* the visualiser: a new picture each pass, in sbuf when free */

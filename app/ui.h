@@ -29,6 +29,9 @@ enum {
     UI_SONG,                   /* SONG 2/2: the song's entries, each its pattern and its bars (as SLOOP's SONG screen) */
     UI_VIS,                    /* HOME tapped on TRACKS: the visualiser (vis.h), the messages over it */
     UI_SPLASH                  /* the start: the SLOOP logo drawn in (vis.h) */
+#if BOARD_SMK37
+    , UI_KEYS                  /* KNOB BANK held: the KEYS, the layer's and the split's sounds, large */
+#endif
 };
 /* a step cell (TRACKS) */
 enum { UC_NOTE = 1, UC_LOCK = 2, UC_COND = 4, UC_RAT = 8, UC_OUT = 16, UC_PLAY = 32 };
@@ -86,6 +89,8 @@ typedef struct {
     uint8_t batt, batt_usb;                        /* (3.3.6) the battery: 0..100 % (255: not read yet); USB: 1..8, the light's step */
 #if BOARD_SMK37
     uint8_t bpm_lit;                               /* the word BPM lit, at the tempo: 0 dim, 1 a beat's first half, 2 a bar's first beat */
+    uint8_t keys_layer, keys_split, keys_note;     /* KEYS: the layer's and the split's rows (position + 1; 0 none), the split's
+                                                    * first key above it (MIDI); UI_KEYS: their names in page_name and sub */
 #endif
 } ui_view;
 

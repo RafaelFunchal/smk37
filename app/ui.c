@@ -373,6 +373,41 @@ static void step_cell(int x, int y, int w, int h, uint8_t f, uint16_t c)
     if (f & UC_PLAY) gfx_fill(x, y + h + 1, w, 2, TXT);
     if (f & (UC_LOCK | UC_COND | UC_RAT)) gfx_fill(x, y - 3, w, 2, YEL);
 }
+#if BOARD_SMK37
+extern const char *const harm_note_name[12];
+static char *ks_put(char *p, const char *s) { while (*s) *p++ = *s++; *p = 0; return p; }
+static char *keys_note_str(char *p, int n)                      /* "C4" */
+{
+    const char *s = harm_note_name[(n % 12 + 12) % 12]; while (*s) *p++ = *s++;
+    int o = n / 12 - 1; if (o < 0) { *p++ = '-'; o = -o; } *p++ = (char)('0' + o % 10); *p = 0; return p;
+}
+static void keys_split_tag(char *b, int note) { b[0] = '<'; keys_note_str(b + 1, note); }   /* "<C4": the keys below C4 */
+/* KNOB BANK held: the KEYS large. Each part: what turns it, then its track's number, in its colour, and its sound */
+static void keys_part(const ui_view *v, int y, const char *what, const char *knob, int row, const char *name, const char *more)
+{
+    gfx_text(&font_s, 10, y, what, DIM);
+    gfx_text_r(&font_s, 230, y, knob, DIM);
+    y += 22;
+    if (!row) { gfx_text(&font_m, 10, y, "OFF", DIM); }
+    else {
+        uint16_t c = v->col[row - 1];
+        char n[2] = { (char)('0' + row), 0 };
+        gfx_rfill(10, y, 26, 26, 5, c); gfx_text_c(&font_m, 23, y + (26 - font_m.cap) / 2, n, BG);
+        fit(&font_m, 44, y + (26 - font_m.cap) / 2, 190, font_m.cap, name, TXT, 0);
+    }
+    if (row && more && more[0]) fit(&font_s, 10, y + 32, 224, font_s.cap, more, DIM, 0);
+}
+static void page_keys(const ui_view *v)
+{
+    if (!gfx_visible(0, HEAD_Y, GFX_W, GFX_H - HEAD_Y)) return;
+    char m[24], l[16];
+    keys_note_str(ks_put(m, "KEYS BELOW "), v->keys_note);
+    ks_put(ks_put(l, "WITH TRACK "), (char[2]){ (char)('1' + v->trk), 0 });
+    keys_part(v, HEAD_Y + 4, "LAYER", "K3", v->keys_layer, v->page_name, l);
+    keys_part(v, HEAD_Y + 84, "SPLIT", "K4", v->keys_split, v->sub, m);
+    fit(&font_s, 10, HEAD_Y + 164, 224, font_s.cap, v->keys_split ? "A KEY MOVES THE SPLIT" : "A KEY SETS A SPLIT THERE", DIM, 0);
+}
+#endif
 static void page_tracks(const ui_view *v)
 {
     for (int t = 0; t < v->ntrk && t < 5; t++) {
@@ -387,6 +422,14 @@ static void page_tracks(const ui_view *v)
         char nm[20]; sound_name(nm, v, t);
         const char *badge = v->rec[t] ? "REC" : v->solo[t] ? "SOLO" : v->mute[t] ? "MUTE" : 0;
         uint16_t bc = v->solo[t] && !v->rec[t] ? YEL : RED;
+#if BOARD_SMK37
+        char kt[12];                                      /* (the KEYS: which rows the layer and the split play) */
+        if (!badge && v->keys_layer == t + 1) { badge = "LAYER"; bc = c; }
+        else if (!badge && v->keys_split == t + 1) {      /* "SPLIT <A#3", or "SPLIT" where the sound's name is long */
+            keys_split_tag(ks_put(kt, "SPLIT "), v->keys_note); badge = kt; bc = c;
+            if (31 + gfx_text_w(FS, nm) + 8 + gfx_text_w(FS, kt) > 234) kt[5] = 0;
+        }
+#endif
         const gfx_font *rf = FS; if (rf != &font_s && v->kind[t] && 31 + gfx_text_w(rf, nm) + 6 + gfx_text_w(rf, v->kind[t]) >= 234 - (badge ? gfx_text_w(rf, badge) + 8 : 0)) rf = &font_s;   /* (LARGE: both, or both as before) */
         int bw = badge ? gfx_text_w(rf, badge) + 8 : 0;
         int e = gfx_text(rf, 31, y + 3, nm, t == v->trk ? TXT : DIM);
@@ -856,6 +899,9 @@ void ui_draw(const ui_view *v)
     else {
         top_bar(v);
         if (v->page == UI_TRACKS) page_tracks(v);
+#if BOARD_SMK37
+        else if (v->page == UI_KEYS) page_keys(v);
+#endif
         else {
             track_header(v);
             switch (v->page) {

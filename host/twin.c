@@ -2266,8 +2266,21 @@ static void sc_smk(void)
     for (int i = 0; i < 8 && smk_layer != t2; i++) turn(ENC_ALGORITHM, 1);
     keydown(5); wait_ms(40); keyup(5);
     for (int i = 0; i < 8 && smk_lower != t3; i++) turn(ENC_PRESETS, 1);
+    wait_ms(100); shot("smk-keys-setup");                        /* (KNOB BANK held: the KEYS, as set) */
     tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
     EXPECT(smk_layer == t2 && smk_lower == t3 && smk_split == 5, "KEYS set again: %d %d %d", smk_layer, smk_lower, smk_split);
+    wait_ms(1800); shot("smk-keys-play");                         /* (the page as played: the layer and the split shown) */
+    EXPECT(V.page != UI_KEYS && V.keys_layer == POS[t2] + 1 && V.keys_split == POS[t3] + 1 && V.keys_note == 53 + 5,
+           "KEYS: the rows' tags (layer %d, split %d at %d; page %d)", V.keys_layer, V.keys_split, V.keys_note, V.page);
+    /* KNOB BANK held only to look: the KEYS page after a moment, gone when let go, DRUM PADS untouched; a tap: no page */
+    { int dp = smk_drumpads;
+      tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(120);
+      EXPECT(V.page != UI_KEYS, "KNOB BANK just pressed: the KEYS page already (a tap would flash it)");
+      wait_ms(400);
+      EXPECT(V.page == UI_KEYS && !strcmp(V.page_name, smk_snd_name(t2)) && !strcmp(V.sub, smk_snd_name(t3)),
+             "KNOB BANK held: no KEYS page, or the wrong sounds (page %d: %s / %s)", V.page, V.page_name, V.sub);
+      tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
+      EXPECT(V.page != UI_KEYS && smk_drumpads == dp, "KNOB BANK let go after looking: the page stayed (%d), or DRUM PADS toggled (%d)", V.page, smk_drumpads); }
     /* < and > together: SMK-37 SETTINGS, then PANEL TEST, then back */
     select_track(t); trk = t; tap(B_HOME); wait_ms(100);
     int pg0 = sticky, tr0 = trk;
