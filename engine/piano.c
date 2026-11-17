@@ -46,9 +46,13 @@ GB_INLINE int ev(const gb_patch *p, int k) { return gb_iv(p->p[k], ED[k].min, ED
 
 /* ---- the bank */
 static erk_bank bk;
-static int bank_ok, bank_nrel;
+static int bank_ok, bank_nrel, bank_nseg;                  /* (bank_nseg: the samples before the release noises) */
 static uint8_t bank_gen;
 static float bank_rg;                /* the damper noise's floor (the header's rel_gain), kept in RAM: release() reads no flash */
+/* the loops' levels evened out (tools/mkpiano.py flat_table, after the data: "FLT1", u16 count, u16 0, then PIANO_NFLT
+ * gains a sample, 64 = 1.0): a loop's level, measured round it, brought to its start's; none in an older image */
+#define PIANO_NFLT 16
+static const uint8_t *bank_flt;
 GB_SMALL void piano_bank_set(const uint8_t *img)
 {
     bank_ok = 0; bank_gen++;
@@ -67,7 +71,10 @@ GB_SMALL void piano_bank_set(const uint8_t *img)
         if (kk->zone >= h->nzones || (h->nrel && kk->rel >= h->nrel) || !kk->inc) return;
     }
     for (int v = 0; v < 128; v++) if (bk.vel[v].l0 >= h->nlayers || bk.vel[v].l1 >= h->nlayers) return;
-    bank_nrel = h->nrel; bank_rg = (float)h->rel_gain * (1.0f / 32768.0f);
+    bank_nrel = h->nrel; bank_nseg = (int)ns; bank_rg = (float)h->rel_gain * (1.0f / 32768.0f);
+    {   const uint8_t *t = bk.data + h->data_size;
+        bank_flt = t[0] == 'F' && t[1] == 'L' && t[2] == 'T' && t[3] == '1' && (uint32_t)(t[4] | t[5] << 8) == ns + h->nrel ? t + 8 : 0;
+    }
     bank_ok = 1;
 }
 int piano_bank_ok(void) { return bank_ok; }
@@ -96,6 +103,7 @@ enum { SF_DONE = 1, SF_PRIMED = 2 };
 typedef struct {
     uint32_t nxt, pos, frac;        /* the next ADPCM block's header (byte in the data); samples decoded; Q16 */
     float w, wt;                    /* the weight now, and at this block's end */
+    float lg;                       /* the loop's level correction now (bank_flt; 1 before the loop) */
     int16_t s1, s2, x[4];
     uint8_t nib, hdr, si, fl;
 } pst;
@@ -120,6 +128,7 @@ static const erk_smp *smp_of(uint8_t si) { return si & SI_REL ? &bk.rel[si & 0x7
 static void pst_init(pst *s, uint8_t si, float w)
 {
     s->si = si; s->fl = 0; s->w = s->wt = w; s->frac = 0;
+    s->lg = 1.0f;
 }
 /* n samples of a stream into out (Erik37's stream_decode, in runs: up to the ADPCM block's end or the loop's end;
  * past a one-shot's end, zeros, nothing read) */
@@ -176,6 +185,14 @@ static __attribute__((noinline)) void pst_run(pst *s, uint32_t inc, float *buf)
     int n = (int)((f + inc * GB_BLOCK) >> 16);
     a[0] = s->x[0]; a[1] = s->x[1]; a[2] = s->x[2]; a[3] = s->x[3];
     pst_decode(s, a + 4, n);
+    float lg1 = 1.0f;                               /* the loop's level correction where this block ends */
+    const erk_smp *m = smp_of(s->si);
+    if (bank_flt && m->loop_len && s->pos > m->loop) {
+        uint32_t ph = (s->pos - m->loop) * (PIANO_NFLT * 256u) / m->loop_len, i = (ph >> 8) % PIANO_NFLT, j = (i + 1u) % PIANO_NFLT;
+        const uint8_t *g = bank_flt + (uint32_t)(s->si & SI_REL ? bank_nseg + (s->si & 0x7Fu) : s->si) * PIANO_NFLT;
+        lg1 = ((float)g[i] + (float)((int)g[j] - (int)g[i]) * (float)(ph & 255u) * (1.0f / 256.0f)) * (1.0f / 64.0f);
+    }
+    float lg = s->lg, dlg = (lg1 - lg) * (1.0f / GB_BLOCK);
     float w = s->w, dw = (s->wt - s->w) * (1.0f / GB_BLOCK);
     for (int i = 0; i < GB_BLOCK; i++) {
         f += inc;
@@ -183,9 +200,10 @@ static __attribute__((noinline)) void pst_run(pst *s, uint32_t inc, float *buf)
         float t = (float)(f & 0xFFFFu) * (1.0f / 65536.0f);
         float c1 = 0.5f * (x[2] - x[0]), c2 = x[0] - 2.5f * x[1] + 2.0f * x[2] - 0.5f * x[3];
         float c3 = 0.5f * (x[3] - x[0]) + 1.5f * (x[1] - x[2]);
-        w += dw;
-        buf[i] += ((((c3 * t) + c2) * t + c1) * t + x[1]) * w;
+        w += dw; lg += dlg;
+        buf[i] += ((((c3 * t) + c2) * t + c1) * t + x[1]) * w * lg;
     }
+    s->lg = lg1;
     s->x[0] = (int16_t)a[n]; s->x[1] = (int16_t)a[n + 1]; s->x[2] = (int16_t)a[n + 2]; s->x[3] = (int16_t)a[n + 3];
     s->frac = f & 0xFFFFu; s->w = s->wt;
 }

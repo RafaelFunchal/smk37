@@ -33,6 +33,7 @@ def main():
     ap.add_argument('--base', type=auto_int, default=0x78000, help='flash address of the image (default 0x78000)')
     ap.add_argument('--limit', type=auto_int, default=0xC0000, help='flash address the image must end by (default 0xC0000)')
     ap.add_argument('--hole', default='0xC0000:0xC2000', help='lo:hi, flash no sample may use (the keyboard calibration)')
+    ap.add_argument('--no-flat', action='store_true', help="no loop levels table (the loops pulse as recorded): for comparisons")
     a = ap.parse_args()
     hole_lo, hole_hi = (int(x, 0) for x in a.hole.split(':'))
 
@@ -112,6 +113,7 @@ def main():
         img += struct.pack(SMP, *s)
     assert len(img) == hdr_len
     img += out
+    if not a.no_flat: img += flat_table(out, smp2 + rel2)
     end = a.base + len(img)
     print('mkpiano: %d zones x 2 layers + %d release noises, %d bytes (tables %d, data %d, hole padding %d)'
           % (nz2, nr, len(img), hdr_len, len(out), pads))
@@ -123,6 +125,57 @@ def main():
     with open(a.out, 'wb') as f:
         f.write(img)
     print('mkpiano: wrote', a.out)
+
+
+# ---- the loops' levels evened out (engine/piano.c reads it: "FLT1", u16 count, u16 0, then 16 gains a sample)
+# A loop of 0.13 to 0.5 s repeats the strings' beating and its own decay: its level rises and falls once a loop (the
+# pulse players hear, 1 to 2 dB about twice a second, in Erik37's own engine too). Each loop's level is measured around
+# 16 points (a circular moving average, at least 2048 samples: whole periods of the lowest notes) and a gain for each
+# brings it to the level at the loop's start, where the sample enters it: the engine ramps between them, a block at a
+# time. Gains are u8, 64 = 1.0, kept within 0.5 .. 2. A sample without a loop: all 64.
+FILT = [(0, 0), (60, 0), (122, -60), (115, -52), (126, -63), (124, -61), (118, -58), (108, -52), (98, -55), (88, -50),
+        (76, -46), (60, -40), (40, -36), (16, -32), (30, 0), (-30, -24)]          # (engine/erk_codec.h erk_filt)
+NFLT = 16
+
+
+def decode(data, off, n):
+    """the first n samples of a block-ADPCM sample at data[off:] (engine/erk_codec.h), as floats"""
+    out, s1, s2, p = [], 0, 0, off
+    while len(out) < n:
+        h = data[p]; c1, c2 = FILT[h >> 4]; sh = h & 15
+        for i in range(32):
+            q = data[p + 1 + (i >> 1)]; q = (q >> 4) if i & 1 else (q & 15)
+            s = ((c1 * s1 + c2 * s2 + 32) >> 6) + ((q ^ 8) - 8) * (1 << sh)
+            s = -32768 if s < -32768 else 32767 if s > 32767 else s
+            s2, s1 = s1, s; out.append(float(s))
+        p += 17
+    return out[:n]
+
+
+def flat_table(data, smps):
+    import math
+    t = bytearray(b'FLT1' + struct.pack('<HH', len(smps), 0))
+    worst = 0.0
+    for s in smps:
+        off, ln, loop, llen = s[0], s[1], s[2], s[3]
+        if not llen:
+            t += bytes([64] * NFLT); continue
+        x = decode(data, off, loop + llen)[loop:]
+        sq = [v * v for v in x]; n = len(sq); w = max(min(n, 2048), n // 8)
+        pre = [0.0]
+        for v in sq + sq:
+            pre.append(pre[-1] + v)                       # (circular: the loop twice)
+        def lvl(c):                                       # the RMS of w samples centred on c, round the loop
+            a = (c - w // 2) % n
+            return math.sqrt(max(pre[a + w] - pre[a], 1e-9) / w)
+        ref = lvl(0)
+        for k in range(NFLT):
+            g = ref / lvl(k * n // NFLT)
+            g = 0.5 if g < 0.5 else 2.0 if g > 2.0 else g
+            worst = max(worst, abs(20 * math.log10(g)))
+            t.append(int(round(g * 64)))
+    print('mkpiano: loops evened out (the largest correction %.1f dB)' % worst)
+    return t
 
 
 if __name__ == '__main__':
