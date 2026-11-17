@@ -131,6 +131,11 @@ With PADS on CONTROL (the default), on the playing pages the pads are a control 
   it is now (your edits, its effects, its arpeggiator) is kept in that slot, written to the flash ("USER SOUNDS SAVED").
   They are YOURS 1-8 in SOUNDS and EDIT's USER SOUNDS. Lit: faint when empty, in the track's colour when kept, full when
   it is the track's sound now. Synth tracks only (not the drum track).
+  **With a layer or a split on**, a slot keeps them too: the layer's and the split's sounds, their tracks and the split
+  point. Tapped, it puts it all back: each sound on its track, the layer and the split on. A slot kept without a layer
+  or split turns them off when tapped (LAYER and SPLIT still bring them back). A split on the drum track keeps its point
+  (the kit stays as it is). The layers' and splits' sounds use YOURS 9-24 (two for each slot): EDIT's USER SOUNDS
+  does not write there (it says 9-24: KEPT FOR THE PAD SLOTS); 25-32 are free for it.
 - **UP / DOWN**: the next or previous kind of sound (KEYS, BASS, PAD, LEAD... then FAVS and YOURS), its first sound.
 - **LEFT / RIGHT**: the previous or next sound, as PRESETS (K4) does, but the page stays as it is.
 - **SOLO**: the track alone (the others silent); again: all back. Lit while on.
