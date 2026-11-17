@@ -2186,17 +2186,99 @@ static void sc_smk(void)
     /* KNOB BANK: DRUM PADS, the drums from the pads while the keys play the synth */
     int dt = drum_trk(); EXPECT(dt >= 0, "no drum track");
     xtap(SB_KNOB_BANK); wait_ms(100);
-    EXPECT(smk_drumpads && tw_padmode, "KNOB BANK: no DRUM PADS");
+    EXPECT(smk_pads == PM_DRUMS && tw_padmode, "KNOB BANK: no DRUM PADS");
     tw_pad(0, 110); wait_ms(60);
     int drum_on = 0; for (int i = 0; i < GB_NVOICE; i++) if (S.v[i].state != V_FREE && S.v[i].track == dt) drum_on = 1;
     tw_pad(0, 0); wait_ms(60);
     EXPECT(drum_on && trk == t, "DRUM PADS: pad 1 did not play the drums (or the track changed)");
     xtap(SB_KNOB_BANK); wait_ms(100);
-    EXPECT(!smk_drumpads && !tw_padmode, "KNOB BANK again: DRUM PADS still on");
-    /* a pad as a white key: pad 1 = F3 (note 53 with no scale) */
+    EXPECT(smk_pads == PM_CONTROL, "KNOB BANK again: not back to the pads' CONTROL (%d)", smk_pads);
+    /* PADS: NOTES, a pad as a white key: pad 1 = F3 (note 53 with no scale) */
+    smk_pads = PM_NOTES; wait_ms(100);
+    EXPECT(!tw_padmode, "PADS NOTES: the pads still sent as controls or drums");
     tw_pad(0, 90); wait_ms(60);
     EXPECT(sounding(t, 53), "pad 1: no F3");
     tw_pad(0, 0); wait_ms(60);
+    /* PADS: CONTROL. Slots 1-8 (pads 1-4, 9-12), UP DOWN LEFT RIGHT (5-8), SOLO LAYER SPLIT TAP (13-16) */
+    extern uint32_t tw_padcol[16];
+#define PADLVL(p) tw_lvl[14 + white_key[p]]
+    smk_pads = PM_CONTROL; wait_ms(100);
+    EXPECT(tw_padmode, "PADS CONTROL: the pads not taken as controls");
+    { m = msg_mark(); tw_pad(0, 90); wait_ms(60);
+      EXPECT(!sounding(t, 53), "PADS CONTROL: pad 1 played a note");
+      tw_pad(0, 0); wait_ms(80);
+      EXPECT(said_since(m, "SLOT 1 EMPTY"), "PADS CONTROL: an empty slot tapped, not said");
+      int st = sticky, p0 = preset_of[t];
+      tw_pad(7, 90); wait_ms(60); tw_pad(7, 0); wait_ms(100);
+      EXPECT(preset_of[t] != p0 && sticky == st && tw_padmode, "RIGHT: not the next sound, or the page changed (%d -> %d, page %d -> %d)", p0, preset_of[t], st, sticky);
+      tw_pad(6, 90); wait_ms(60); tw_pad(6, 0); wait_ms(100);
+      EXPECT(preset_of[t] == p0, "LEFT: not back to the sound before (%d, %d)", preset_of[t], p0);
+      int k0 = p0 >= 0 && p0 < gb_npresets ? gb_presets[p0].kind : -1;
+      tw_pad(4, 90); wait_ms(60); tw_pad(4, 0); wait_ms(100);
+      int p1 = preset_of[t], k1 = p1 >= 0 && p1 < gb_npresets ? gb_presets[p1].kind : -2;
+      EXPECT(p1 != p0 && k1 != k0 && sticky == st, "UP: not another kind of sound (%d %d -> %d %d)", p0, k0, p1, k1);
+      tw_pad(5, 90); wait_ms(60); tw_pad(5, 0); wait_ms(100);
+      int p2 = preset_of[t], k2 = p2 >= 0 && p2 < gb_npresets ? gb_presets[p2].kind : -3;
+      EXPECT(k2 == k0, "DOWN: not back to the kind before (%d, %d)", k2, k0);
+      /* slot 1 held 2 s: the sound kept; another sound; slot 1 tapped: back */
+      int keep = preset_of[t]; m = msg_mark();
+      tw_pad(0, 90); wait_ms(2300); tw_pad(0, 0);
+      EXPECT(wait_msg(m, "USER SOUNDS SAVED", 8000) && us_used(0), "slot 1 held 2 s: the sound not kept (%d)", us_used(0));
+      EXPECT(preset_of[t] == US_BASE + 0, "slot 1 kept: the track's sound not slot 1's (%d)", preset_of[t]);
+      tw_pad(7, 90); wait_ms(60); tw_pad(7, 0); wait_ms(150);
+      EXPECT(preset_of[t] != US_BASE + 0, "RIGHT after the slot: the sound did not change");
+      m = msg_mark(); tw_pad(0, 90); wait_ms(100); tw_pad(0, 0); wait_ms(200);
+      EXPECT(preset_of[t] == US_BASE + 0 && said_since(m, "SLOT 1 ·"), "slot 1 tapped: its sound not loaded (%d)", preset_of[t]);
+      (void)keep;
+      /* SOLO: the track alone, again: all back */
+      tw_pad(12, 90); wait_ms(60); tw_pad(12, 0); wait_ms(80);
+      int alone = solo[t]; for (int i = 0; i < NTRK; i++) if (i != t && solo[i]) alone = 0;
+      EXPECT(alone && PADLVL(12) == 4, "SOLO: the track not alone, or its pad not lit (%d)", PADLVL(12));
+      tw_pad(12, 90); wait_ms(60); tw_pad(12, 0); wait_ms(80);
+      EXPECT(!solo_any() && PADLVL(12) == 1, "SOLO again: still a solo, or its pad lit (%d)", PADLVL(12));
+      /* LAYER and SPLIT: on, off, back as they were */
+      int8_t l0 = smk_layer, lo0 = smk_lower, s0 = smk_split;
+      tw_pad(13, 90); wait_ms(60); tw_pad(13, 0); wait_ms(80);
+      int L1 = smk_layer;
+      EXPECT(L1 >= 0 && L1 != t && !is_drum(L1), "LAYER: not on another synth track (%d)", L1);
+      tw_pad(13, 90); wait_ms(60); tw_pad(13, 0); wait_ms(80);
+      EXPECT(smk_layer == -1, "LAYER again: not off (%d)", smk_layer);
+      tw_pad(13, 90); wait_ms(60); tw_pad(13, 0); wait_ms(80);
+      EXPECT(smk_layer == L1 && PADLVL(13) == 4 && tw_padcol[13] == smk_rgb(TRK_COL[L1]), "LAYER a third time: not back as it was (%d, %d), or its pad not lit in its colour", smk_layer, L1);
+      tw_pad(14, 90); wait_ms(60); tw_pad(14, 0); wait_ms(80);
+      int S1 = smk_split, D1 = smk_lower;
+      EXPECT(S1 == 7 && D1 >= 0 && D1 != t, "SPLIT: not on, below C4 (%d, track %d)", S1, D1);
+      keydown(2); wait_ms(80);
+      EXPECT(sounding(D1, 55) && !sounding(t, 55), "SPLIT by the pad: G3 not on the split's track");
+      keyup(2); wait_ms(80);
+      tw_pad(14, 90); wait_ms(60); tw_pad(14, 0); wait_ms(80);
+      EXPECT(smk_split == -100, "SPLIT again: not off (%d)", smk_split);
+      tw_pad(14, 90); wait_ms(60); tw_pad(14, 0); wait_ms(80);
+      EXPECT(smk_split == S1 && smk_lower == D1 && PADLVL(14) == 4, "SPLIT a third time: not back as it was (%d %d), or its pad not lit", smk_split, smk_lower);
+      EXPECT(PADLVL(0) == 4 && preset_of[t] == US_BASE + 0, "slot 1: its sound on the track, its pad not full (%d)", PADLVL(0));
+      {   /* the pads as lit: 8 x 2, their colours at their levels (build/.../smk-pads-lights.ppm) */
+          static const int SC[5] = { 0, 14, 48, 128, 255 };
+          char path[512]; snprintf(path, sizeof path, "%s/smk-pads-lights.ppm", tw_out);
+          FILE *f = fopen(path, "wb");
+          if (f) { fprintf(f, "P6 %d %d 255\n", 8 * 56, 2 * 56);
+              for (int y = 0; y < 112; y++) for (int x = 0; x < 448; x++) {
+                  int p = (y / 56) * 8 + x / 56, ix = x % 56, iy = y % 56; uint8_t px[3] = { 18, 18, 22 };
+                  if (ix >= 4 && ix < 52 && iy >= 4 && iy < 52) {
+                      uint32_t c = tw_padcol[p] ? tw_padcol[p] : tw_tint; int l = SC[PADLVL(p) > 4 ? 4 : PADLVL(p)];
+                      px[0] = (uint8_t)(((c >> 16) & 255) * l / 255); px[1] = (uint8_t)(((c >> 8) & 255) * l / 255); px[2] = (uint8_t)((c & 255) * l / 255);
+                      if (l < 30) { px[0] = (uint8_t)(px[0] + 24); px[1] = (uint8_t)(px[1] + 24); px[2] = (uint8_t)(px[2] + 26); }
+                  }
+                  fwrite(px, 1, 3, f); }
+              fclose(f); } }
+      smk_layer = l0; smk_lower = lo0; smk_split = s0;
+      /* TAP: four taps 0.5 s apart, 120 BPM */
+      float b0 = Q.bpm;
+      for (int i = 0; i < 4; i++) { tw_pad(15, 100); wait_ms(60); tw_pad(15, 0); wait_ms(440); }
+      printf("[%8.3f]    PADS CONTROL: TAP four times 0.5 s apart: %.1f BPM\n", tw_s(), Q.bpm);
+      EXPECT(fabsf(Q.bpm - 120.0f) <= 2.0f, "TAP: %.1f BPM (120)", Q.bpm);
+      seq_set_bpm(&Q, b0);
+      apply_preset(t, p0); wait_ms(100);
+      shot("smk-pads-control"); }
     /* the drum track: the outer keys are KICK and RIDE */
     select_track(dt); trk = dt; wait_ms(80);
     tw_ext(0, 100); wait_ms(40);
@@ -2211,12 +2293,12 @@ static void sc_smk(void)
     int pad = -1; for (int i = 0; i < gb_npresets; i++) if (gb_presets[i].kind == K_PAD) { pad = i; break; }
     EXPECT(pad >= 0 && t2 != t && t3 != t && !is_drum(t2) && !is_drum(t3), "KEYS: the tracks for the test");
     apply_preset(t2, pad); wait_ms(100);
-    int dp = smk_drumpads;
+    int dp = smk_pads;
     tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(60);
     for (int i = 0; i < 8 && smk_layer != t2; i++) turn(ENC_ALGORITHM, 1);
     tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
     EXPECT(smk_layer == t2, "KNOB BANK + K3: the layer not track %d (%d)", t2, smk_layer);
-    EXPECT(smk_drumpads == dp, "KNOB BANK held for the setup: DRUM PADS toggled on its release");
+    EXPECT(smk_pads == dp, "KNOB BANK held for the setup: DRUM PADS toggled on its release");
     EXPECT(trk == t, "KNOB BANK + K3: the track changed too");
     keydown(9); wait_ms(80);
     EXPECT(sounding(t, 62) && sounding(t2, 62), "LAYER: D4 not on both tracks (%d, %d)", sounding(t, 62), sounding(t2, 62));
@@ -2273,14 +2355,14 @@ static void sc_smk(void)
     EXPECT(V.page != UI_KEYS && V.keys_layer == POS[t2] + 1 && V.keys_split == POS[t3] + 1 && V.keys_note == 53 + 5,
            "KEYS: the rows' tags (layer %d, split %d at %d; page %d)", V.keys_layer, V.keys_split, V.keys_note, V.page);
     /* KNOB BANK held only to look: the KEYS page after a moment, gone when let go, DRUM PADS untouched; a tap: no page */
-    { int dp = smk_drumpads;
+    { int dp = smk_pads;
       tw_xbtn |= 1u << SB_KNOB_BANK; wait_ms(120);
       EXPECT(V.page != UI_KEYS, "KNOB BANK just pressed: the KEYS page already (a tap would flash it)");
       wait_ms(400);
       EXPECT(V.page == UI_KEYS && !strcmp(V.page_name, smk_snd_name(t2)) && !strcmp(V.sub, smk_snd_name(t3)),
              "KNOB BANK held: no KEYS page, or the wrong sounds (page %d: %s / %s)", V.page, V.page_name, V.sub);
       tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
-      EXPECT(V.page != UI_KEYS && smk_drumpads == dp, "KNOB BANK let go after looking: the page stayed (%d), or DRUM PADS toggled (%d)", V.page, smk_drumpads); }
+      EXPECT(V.page != UI_KEYS && smk_pads == dp, "KNOB BANK let go after looking: the page stayed (%d), or DRUM PADS toggled (%d)", V.page, smk_pads); }
     /* < and > together: SMK-37 SETTINGS, then PANEL TEST, then back */
     select_track(t); trk = t; tap(B_HOME); wait_ms(100);
     int pg0 = sticky, tr0 = trk;
@@ -2293,11 +2375,11 @@ static void sc_smk(void)
     EXPECT(smk_sens == 2 && tw_pad_sens == 2, "PAD SENS: %d (the panel %d)", smk_sens, tw_pad_sens);
     EXPECT(smk_light == 1 && smk_krev == 1 && tw_knob_rev == 1, "PAD LIGHT %d, KNOBS %d (the panel %d)", smk_light, smk_krev, tw_knob_rev);
     /* K2: the settings' page 2/2, PADS PLAY: DRUMS (kept with the project: sc_smk_reboot) */
-    { int was = smk_drumpads; if (was) { xtap(SB_KNOB_BANK); wait_ms(60); }
+    { int was = smk_pads; if (was) { xtap(SB_KNOB_BANK); wait_ms(60); }
       turn(ENC_SELECT, 1); wait_ms(80);
       EXPECT(sticky == PG_SMKSET && !strncmp(V.page_name, "SMK-37 2/2", 10), "K2: not the settings' page 2/2 (%s)", V.page_name);
       m = msg_mark(); turn(ENC_KNOB1, 1); wait_ms(80); shot("smk-settings-2");
-      EXPECT(smk_drumpads && tw_padmode && said_since(m, "PADS: THE DRUM KIT"), "PADS PLAY: not DRUMS (%d, the panel %d)", smk_drumpads, tw_padmode);
+      EXPECT(smk_pads == PM_DRUMS && tw_padmode && said_since(m, "PADS: THE DRUM KIT"), "PADS PLAY: not DRUMS (%d, the panel %d)", smk_pads, tw_padmode);
       turn(ENC_SELECT, -1); wait_ms(80);
       EXPECT(!strncmp(V.page_name, "SMK-37 1/2", 10), "K2 back: not the settings' page 1/2 (%s)", V.page_name); }
     lr_together();
@@ -2436,7 +2518,7 @@ static void sc_smk_reboot(void)                  /* after sc_smk's flash: the pr
     int t = synth_trk();
     EXPECT(S.trk[t].patch.engine == ENG_PIANO, "SMK-37: the track's piano not kept (engine %d)", S.trk[t].patch.engine);
     EXPECT(ui_large == 1, "SMK-37: TEXT LARGE not kept");
-    EXPECT(smk_drumpads == 1, "SMK-37: PADS PLAY DRUMS not kept");
+    EXPECT(smk_pads == PM_DRUMS, "SMK-37: PADS DRUMS not kept");
     EXPECT(smk_kv == KV_HARD && smk_sens == 2 && smk_light == 1 && smk_krev == 1, "SMK-37: the settings not kept (%d %d %d %d)", smk_kv, smk_sens, smk_light, smk_krev);
     EXPECT(smk_layer == smk_trk_shown(1) && smk_lower == smk_trk_shown(2) && smk_split == 5, "SMK-37: KEYS not kept with the project (layer %d, split's track %d, split %d)", smk_layer, smk_lower, smk_split);
     keydown(9); wait_ms(80);

@@ -436,7 +436,8 @@ float smk_mod(void) { return tw_mod; }
 int smk_pedal_take(void) { return ped_r == ped_w ? -1 : pedq[ped_r++ & 15]; }
 int smk_batt_raw(void) { return 600; }
 void smk_pad_tint(uint32_t rgb) { tw_tint = rgb; }
-void smk_pad_color(int pad, uint32_t rgb) { (void)pad; (void)rgb; }
+uint32_t tw_padcol[16];                                   /* (the pads' own colours, 0: the tint) */
+void smk_pad_color(int pad, uint32_t rgb) { if (pad >= 0 && pad < 16) tw_padcol[pad] = rgb; }
 void smk_pad_dim(int lvl) { (void)lvl; }
 void smk_pads_flush(void) { }
 void smk_pad_mode(int drums) { tw_padmode = drums; }
