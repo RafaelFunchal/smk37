@@ -4112,7 +4112,11 @@ COLD __attribute__((noinline)) static void ui_round(void)
         if (ed_sm.on) { ed_sm.on = 0; ed_sm.phase = 0; say_bad("SAMPLE: STOPPED"); }
     }
     /* the autosave: stopped, untouched for 2.5 s, at most every 20 s */
-    if (!Q.playing && !saving && !ed_wr.on && (uint32_t)(now - t_input) > 2500000u * lsb && (uint32_t)(now - t_autosave) > 20000000u * lsb) {
+    if (!Q.playing && !saving && !ed_wr.on && (uint32_t)(now - t_input) > 2500000u * lsb && (uint32_t)(now - t_autosave) > 20000000u * lsb
+#if BOARD_SMK37
+        && !smk_flash_voices()                            /* (a piano ringing: the save would silence it; fw/smk.inc) */
+#endif
+       ) {
         t_autosave = now; save_project(0);
     }
     if ((uint32_t)(now - t_pot) > 20000u * lsb) {

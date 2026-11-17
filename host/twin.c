@@ -51,7 +51,7 @@ static void wait_until(uint64_t ns) { if (ns > tw_ns) { tw_wake = ns; tw_give(0)
 
 /* ---- what the firmware said (its messages), its sound */
 static char tw_msgs[8192][40]; static uint32_t tw_nmsg, tw_seen_gen;
-static double tw_jump; static uint32_t tw_clip;   /* (the largest step between two samples; samples at full scale) */
+static double tw_jump; static uint32_t tw_clip, tw_silent_halves;   /* (tw_silent_halves: halves all zero) */   /* (the largest step between two samples; samples at full scale) */
 static double tw_peak, tw_sq; static uint64_t tw_sqn; static int tw_wild; static FILE *tw_wav; static uint32_t tw_wav_n;
 void twin_tick(void)
 {
@@ -77,6 +77,7 @@ void twin_audio(const int32_t *lr, uint32_t frames)
         }
         tw_cost_avg = tw_cost_avg <= 0.0 ? c : tw_cost_avg + (gb_minf((float)c, (float)(4.0 * tw_cost_avg)) - tw_cost_avg) * 0.01;
     }
+    { uint32_t z = 1; for (uint32_t i = 0; i < 2 * frames; i++) if (lr[i]) { z = 0; break; } tw_silent_halves += z; }
     for (uint32_t i = 0; i < 2 * frames; i++) {
         double a = fabs((double)lr[i]) / 8388608.0;
         if (a > tw_peak) tw_peak = a;
@@ -2408,12 +2409,35 @@ static void sc_smkdemo(void)
     fclose(tw_film); tw_film = 0; tw_wav_close();
 }
 #endif
+#if BOARD_SMK37
+/* the autosave and a sound read from the flash (the PIANO; SAMPLE, GRAIN, SLICE): a save turns the flash window off,
+ * and such a voice is silent meanwhile (a gap of ~0.5 s, its ends two clicks). Found on the first SMK-37, a piano
+ * note let ring: the autosave waits for the voices to end; then it saves */
+static void sc_smk_autosave(void)
+{
+    boot_wait(); for (int i = 0; i < 400 && splash_on; i++) wait_ms(10);
+    int t = synth_trk(); select_track(t); trk = t;
+    apply_preset(t, preset_named("CONCERT")); wait_ms(100); /* (the project changed: something to save) */
+    sm_set(&S.trk[t].send_rev, 0.0f); sm_set(&S.trk[t].send_dly, 0.0f); sm_set(&S.trk[t].send_cho, 0.0f);   /* (dry: the note alone) */
+    uint32_t e0 = tw_erases;
+    double t0 = tw_s(); wait_ms((18.0 - (t0 > 18.0 ? 18.0 : t0)) * 1000.0);   /* (the first autosave: 20 s after the start) */
+    play_on(GB_OWNER(OWN_KEY, 0), t, 60, 0.9f); wait_ms(200);
+    tw_silent_halves = 0; wait_ms(3500);                    /* (nobody touches it: the autosave falls due meanwhile) */
+    uint32_t gaps = tw_silent_halves, during = tw_erases - e0;
+    play_off(GB_OWNER(OWN_KEY, 0), t, 60);
+    printf("[%8.3f]    a piano note held 3.5 s, the autosave due: %u silent halves, %u erases meanwhile\n", tw_s(), gaps, during);
+    EXPECT(gaps == 0, "the autosave silenced a sounding piano note: %u halves (%.0f ms) of nothing", gaps, gaps * 5.8);
+    for (int i = 0; i < 1000 && tw_erases == e0; i++) wait_ms(10);
+    EXPECT(tw_erases > e0, "the autosave never came once the note had ended");
+    wait_saved(3000);
+}
+#endif
 static const struct { const char *name; void (*fn)(void); } SC[] = {
     { "boot", sc_boot }, { "reboot", sc_reboot }, { "sounds", sc_sounds }, { "ukit", sc_ukit }, { "pages", sc_pages }, { "record", sc_record },
     { "powercut", sc_powercut }, { "aftercut", sc_after_cut }, { "sample", sc_sample }, { "editor", sc_editor },
     { "monkey", sc_monkey }, { "import", sc_import }, { "midi", sc_midi }, { "rescue", sc_rescue }, { "calib", sc_calib }, { "settings", sc_settings }, { "play", sc_play }, { "levels", sc_levels }, { "mixui", sc_mixui }, { "fx", sc_fx }, { "editor2", sc_editor2 }, { "serve", sc_serve }, { "vis", sc_vis }, { "banksave", sc_banksave }, { "punch", sc_punch }, { "film", sc_film }, { "inst", sc_inst }, { "film2", sc_film2 }, { "bigproj", sc_bigproj }, { "bigcut", sc_bigcut }, { "punch2", sc_punch2 }, { "crumb", sc_crumb }, { "nan", sc_nan }, { "sweep", sc_sweep }
 #if BOARD_SMK37
-    , { "smk", sc_smk }, { "pianowav", sc_pianowav }, { "smkdemo", sc_smkdemo }, { "smk-reboot", sc_smk_reboot }, { "smk-leftover", sc_smk_leftover }
+    , { "smk", sc_smk }, { "pianowav", sc_pianowav }, { "smkdemo", sc_smkdemo }, { "smk-autosave", sc_smk_autosave }, { "smk-reboot", sc_smk_reboot }, { "smk-leftover", sc_smk_leftover }
 #endif
 };
 static void (*tw_sc)(void);

@@ -353,6 +353,18 @@ COLD static void smk_lights(void)
     smk_xled(SB_LEFT, 0); smk_xled(SB_RIGHT, 0);
     smk_pads_flush();
 }
+/* a voice that reads the flash as it sounds (the PIANO; SAMPLE, GRAIN, SLICE; a drum kit may be sampled): a save turns
+ * the flash window off, and such a voice is silent meanwhile (~0.5 s: a gap and two clicks). The autosave waits for
+ * them to end (found on the first SMK-37: a piano note let ring with the pedal); a save asked for still goes at once */
+COLD static int smk_flash_voices(void)
+{
+    for (int i = 0; i < GB_NVOICE + GB_NTAIL; i++) {
+        const gb_voice *v = &S.v[i];
+        if (v->state == V_FREE) continue;
+        if (v->eng == ENG_PIANO || v->eng == ENG_SAMPLE || v->eng == ENG_GRAIN || v->eng == ENG_SLICE || v->eng == ENG_DRUM) return 1;
+    }
+    return 0;
+}
 /* once a round of the interface (ui_round) */
 COLD static void smk_round(void)
 {

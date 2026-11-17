@@ -19,6 +19,7 @@ same() {
 run smk smk -
 run smk-reboot smk-reboot $O/smk/flash.bin
 run smk-leftover smk-leftover -
+run smk-autosave smk-autosave -
 same smk smk-reboot
 run boot boot -
 run reboot reboot $O/boot/flash.bin
