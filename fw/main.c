@@ -1359,6 +1359,9 @@ COLD static void fill_view(ui_view *v)
                 static uint32_t t_pct; uint32_t now = time_ticks();
                 if (!saving && !sbuf_held() && (uint32_t)(now - t_pct) > 1000000u * lsb) { t_pct = now; uint32_t c; proj_pct = (proj_measure(&c) * 100u + STORE_PMAX - 1u) / STORE_PMAX; }
                 p = put_s(v->sub, "MEMORY "); p = put_u(p, proj_pct); p = put_s(p, "%"); *p = 0;
+#if BOARD_SMK37 && defined(SMK_BUILD)
+                p = put_s(p, " \xC2\xB7 SMK " SMK_BUILD); *p = 0;   /* (which build: fw/build.sh, the commit; + built with changes) */
+#endif
             }
             *put_s(put_u(b, load_avg), "%") = 0; knob(v, 0, "CPU", b, (int)load_avg, 0);
             *put_s(put_u(b, load_peak), "%") = 0; knob(v, 1, "PEAK", b, (int)load_peak, 0);

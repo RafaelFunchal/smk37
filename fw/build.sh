@@ -8,6 +8,11 @@ TC=${1:-${PI32V2_LLVM:-toolchain/bin}}
 BOARD=${BOARD:-fm1}
 [ "$BOARD" = smk37 ] && [ -n "${BOOT_DIAG:-}" ] && { echo "BOOT_DIAG drives PA2 (fw/xip.S), a key-matrix row on the SMK-37: not for it"; exit 1; }
 case $BOARD in fm1) O=build/fw; BF="";; smk37) O=build/fw-smk37; BF="-DBOARD_SMK37=1";; *) echo "BOARD: fm1 or smk37"; exit 1;; esac
+if [ $BOARD = smk37 ]; then   # (the SMK-37's build, shown on PATCH held: the commit, + if built with changes)
+  G="git -c safe.directory=$(pwd)"; ID=$($G rev-parse --short=7 HEAD 2>/dev/null || echo nogit)
+  [ -n "$($G status --porcelain --untracked-files=no 2>/dev/null)" ] && ID="$ID+"
+  BF="$BF -DSMK_BUILD=\"$ID\""; echo "SMK-37 build $ID"
+fi
 H=hal/fm1; HB=hal/fm1; [ $BOARD = smk37 ] && HB=hal/smk37
 rm -rf $O; mkdir -p $O/o
 CF="${BOOT_DIAG:+-DBOOT_DIAG}${BF:+ $BF} -mcpu=ac791n -O2 -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -Wall -Wextra -Wno-unused-parameter"
