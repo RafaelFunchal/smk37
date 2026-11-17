@@ -43,8 +43,8 @@ names for the buttons and K5..K8 for KNOB 1..4.
 |---|---|
 | Keys F3..G5 (the middle 27) | the FM-1's 27 keys, **with velocity** from your unit's factory curves |
 | Keys C3..E3 and G#5..C6 (the outer 10) | more notes, through the track's scale, chords and arpeggiator; on the drum track C3 KICK, D3 SNARE, E3 HAT, G#5 BELL, A5 OPEN, B5 CRASH, C6 RIDE |
-| 16 pads | the FM-1's 16 white keys (top row 1-8, bottom 9-16): notes, drums, steps (SEQ), patterns (BT), the mix (GLOBE), HOME's keys; with velocity; lit in the track's colour |
-| KNOB BANK tapped | DRUM PADS on / off: the pads play the drum kit whatever track the keys play (its light on). Saved with the project; also SMK-37 SETTINGS 2/2, PADS |
+| 16 pads | (top row 1-8, bottom 9-16, with velocity) on the playing pages: **controls** by default (see *The pads: CONTROL* below), or the drum kit, or the FM-1's 16 white keys (SMK-37 SETTINGS 2/2, PADS). On the pages where they have a job (SEQ's steps, patterns (BT), the mix (GLOBE), SOUNDS, NOTES, HOME's keys) they do that job |
+| KNOB BANK tapped | DRUM PADS on / off: the pads play the drum kit whatever track the keys play (its light on); tapped again, back to what they did before (CONTROL or NOTES). Saved with the project; also SMK-37 SETTINGS 2/2, PADS |
 | KNOB BANK held + K3 | LAYER: a second synth track every key plays too, the same notes and velocity (OFF, or a track) |
 | KNOB BANK held + K4 | SPLIT's track: what the keys below the split point play (OFF, a synth track, or the drums) |
 | KNOB BANK held + a key | the split point at that key (keys below it go to the SPLIT's track); the same key again: no split |
@@ -82,7 +82,7 @@ Press **<** and **>** together. Saved with the project. **K2** turns between its
 
 | Knob | Setting | |
 |---|---|---|
-| K5 | PADS | NOTES: the pads are the white keys of the track the keys play (and light up with its notes). DRUMS: the pads always play the drum kit, whatever track the keys play, and light only when hit. Tapping KNOB BANK switches the same setting. On the pages where the pads have another job (SEQ's steps, SOUNDS, NOTES, a layer's page) they keep doing it |
+| K5 | PADS | CONTROL (default): the pads are controls (*The pads: CONTROL* below). DRUMS: they always play the drum kit, whatever track the keys play, lit as they are hit (as KNOB BANK tapped). NOTES: the white keys of the track the keys play, lit with its notes. On the pages where the pads have a job (SEQ's steps, SOUNDS, NOTES, a held button's page) they keep doing it |
 
 **PANEL TEST** (< and > together again) shows every input as the keyboard reads it, and does nothing with the buttons:
 the 16 tiles are the pads (their force 0..1023 as a number and a bar, lit while held), the dials the faders (0..127),
@@ -117,6 +117,28 @@ After installing, in this order (each step is a minute). If something is off, no
 Settings to try if something is off: knobs backwards, KNOBS REVERSE; pads too eager or too stiff, SENS; velocity too
 loud or soft, TOUCH. Things worth reporting: a knob or button with the wrong name, a key or pad that never shows, pads
 firing at rest, PEAK near 100 %, the screen or the pads' colours wrong.
+
+## The pads: CONTROL
+
+With PADS on CONTROL (the default), on the playing pages the pads are a control surface for the track the keys play:
+
+| | pad 1 | pad 2 | pad 3 | pad 4 | pad 5 | pad 6 | pad 7 | pad 8 |
+|---|---|---|---|---|---|---|---|---|
+| **top** | SLOT 1 | SLOT 2 | SLOT 3 | SLOT 4 | UP | DOWN | LEFT | RIGHT |
+| **bottom** | SLOT 5 | SLOT 6 | SLOT 7 | SLOT 8 | SOLO | LAYER | SPLIT | TAP |
+
+- **SLOT 1-8**: your sounds. **Tap** a slot: its sound on the track. **Hold 2 s** (the pad blinks): the track's sound as
+  it is now (your edits, its effects, its arpeggiator) is kept in that slot, written to the flash ("USER SOUNDS SAVED").
+  They are YOURS 1-8 in SOUNDS and EDIT's USER SOUNDS. Lit: faint when empty, in the track's colour when kept, full when
+  it is the track's sound now. Synth tracks only (not the drum track).
+- **UP / DOWN**: the next or previous kind of sound (KEYS, BASS, PAD, LEAD... then FAVS and YOURS), its first sound.
+- **LEFT / RIGHT**: the previous or next sound, as PRESETS (K4) does, but the page stays as it is.
+- **SOLO**: the track alone (the others silent); again: all back. Lit while on.
+- **LAYER**: the layer off, and back on as it was (the first time: the next synth track). Lit in the layer's colour while on.
+- **SPLIT**: the split off, and back on as it was (the first time: the next track, below C4). Lit in its colour while on.
+- **TAP**: tap the tempo (two taps or more). Blinks on the beat.
+
+Each press says what it did on the screen. KNOB BANK tapped switches the pads to the drum kit and back.
 
 ## Layers and splits
 
