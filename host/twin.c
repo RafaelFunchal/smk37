@@ -2358,6 +2358,10 @@ static void sc_smk(void)
       EXPECT(plain == 3, "a chord without ARP: %u notes (3)", plain);
       EXPECT(arp >= 8, "ARP UP: a chord held 1.5 s gave %u notes (an arpeggio: many more than 3)", arp);
       EXPECT(roll >= 4, "ROLL (ARP held with a key): %u notes (the note again on the grid)", roll); }
+    /* HOME > SEQ · SYSTEM: no CALIBR. on the SMK-37 (the FM-1's: it would remap the printed buttons and write over the
+     * SMK-37's settings in the project) */
+    { int any = 0; for (int s4 = 0; s4 < 5; s4++) for (int k = 0; k < 4; k++) any |= HOME_ROW[s4][k] == -3;
+      EXPECT(!any, "HOME on the SMK-37: the FM-1's CALIBR. offered"); }
     /* the USB light along the bottom: at the tempo (an eighth a step), on the sequencer's eighths while it plays */
     /* (counted over 2 s of simulated time, measured: a wait runs a little past its milliseconds) */
     { float b0 = Q.bpm; int steps[2]; double span[2];

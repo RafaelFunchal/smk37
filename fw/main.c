@@ -977,12 +977,17 @@ COLD static int force_of(int vel, int acc) { return acc ? 4 : vel < 50 ? 0 : vel
 static const char *const FORCE[5] = { "GHOST", "SOFT", "NORM", "HARD", "ACC" };
 /* ---------------------------------------------------------------- HOME: the menu's sections, the calibration */
 static const char *const HOME_SEC[5] = { "PROJECT", "SCREEN 1/4", "LIGHTS 2/4", "AUDIO 3/4", "SEQ · SYSTEM 4/4" };
-#if BOARD_SMK37                                        /* (-5: TEXT, NORMAL or LARGE: the SMK-37's) */
+#if BOARD_SMK37
+/* (-5: TEXT, NORMAL or LARGE: the SMK-37's. No CALIBR. (-3): the FM-1's button matrix, remapped; on the SMK-37 it would
+ * remap the printed buttons, its presses would be played once it is done, and its map written over the SMK-37's own
+ * settings in the project (home bytes 10..38: TOUCH, SENS, LIGHT, KNOBS, TEXT, PADS lost at the next start). The
+ * SMK-37's panel needs none: its buttons are wired as printed; at power-on the FM-1's way in is off as well) */
 static const int8_t HOME_ROW[5][4] = { { -1, -1, -1, -1 }, { -4, HS_ACCEL, -5, -1 }, { HS_LIGHTS, HS_KEYS, HS_NOTES, -1 },
+                                       { HS_LOWCUT, HS_USB, HS_RATE, HS_RESO }, { HS_DPREV, HS_CORE2, -2, -1 } };
 #else
 static const int8_t HOME_ROW[5][4] = { { -1, -1, -1, -1 }, { -4, HS_ACCEL, -1, -1 }, { HS_LIGHTS, HS_KEYS, HS_NOTES, -1 },
-#endif
                                        { HS_LOWCUT, HS_USB, HS_RATE, HS_RESO }, { HS_DPREV, HS_CORE2, -2, -3 } };
+#endif
 static const char *const HS_LABEL[HS_N] = { "ACCEL", "LIGHTS", "KEYS", "NOTES", "SPEAKER", "USB", "RATE", "RESO", "PREVIEW", "CORE 2" };
 COLD static const char *home_value(int i, char *b)
 {
