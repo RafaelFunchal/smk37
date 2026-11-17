@@ -171,6 +171,17 @@ static void decay_release_test(void)
     float nz = rms(B2, 0, S(0.2f) * GB_BLOCK), str = rms(B1, 0, S(0.2f) * GB_BLOCK);
     printf("  C3's release noise: rms %.5f (the string's release: %.5f)\n", nz, str);
     CHECK(nz > 1e-4f && nz > str * 0.02f, "no release noise");
+    /* at its default (10: Erik37's 40 was heard as too loud on the SMK-37), the noise well under the note: middle C
+     * held 1 s and let go, the noise alone (default minus none) over 300 ms against the note held */
+    patch(); pset(5, 0);
+    vstart(&v, 60, 0.8f); vrender(&v, 60, S(1.0f), B1, 0); vrelease(&v); vrender(&v, 60, S(0.3f), B1 + S(1.0f) * GB_BLOCK, 0);
+    patch();
+    vstart(&v, 60, 0.8f); vrender(&v, 60, S(1.0f), B2, 0); vrelease(&v); vrender(&v, 60, S(0.3f), B2 + S(1.0f) * GB_BLOCK, 0);
+    float held_c4 = rms(B2, S(0.8f) * GB_BLOCK, S(1.0f) * GB_BLOCK);
+    for (int i = S(1.0f) * GB_BLOCK; i < S(1.3f) * GB_BLOCK; i++) B2[i] -= B1[i];
+    float nz_c4 = rms(B2, S(1.0f) * GB_BLOCK, S(1.3f) * GB_BLOCK), db = 20.0f * log10f(nz_c4 / held_c4);
+    printf("  middle C's release noise at the default: %.1f dB under the note held\n", -db);
+    CHECK(nz_c4 > 0.0f && db < -24.0f, "the default release noise too loud: %.1f dB of the note held (under -24)", db);
     patch();
 }
 

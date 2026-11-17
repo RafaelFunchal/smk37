@@ -21,7 +21,8 @@
  *   E2 TOUCH     the velocity curve: SOFT NORMAL HARD FIXED (Erik37's touch curves; FIXED: every note at 100)
  *   E3 DECAY     the held decay's length x 0.25 .. 4 (64: as recorded): both slopes and the knee
  *   E4 DAMPER    the release's length x 0.25 .. 4 (64: as recorded): the damper's two stages
- *   E5 NOISE     the damper (release) noise 0..100 (40: Erik37's default; 100: its 1.1 level)
+ *   E5 NOISE     the damper (release) noise 0..100 (10 here, -12 dB from Erik37's default of 40: heard as too loud on
+ *                the SMK-37; 0: none at all; 100: Erik37 1.1's level)
  *   E6 WIDTH     the keys spread across the stereo field 0..100 (80: Erik37's default), constant power
  *   E7 UNA CORDA the soft pedal held at this depth 0..100 (0: off): a softer hammer, quieter, darker */
 #include "piano.h"
@@ -40,7 +41,7 @@
 #define MAXINC (2u << 16)           /* at most two source samples an output frame (a block decodes <= 128) */
 #define LEVEL (0.85f / 32768.0f)    /* the loudest note's peak about 0.5, as SAMPLE's */
 
-static const gb_pd ED[8] = { { 0, 3, 0 }, { 0, 100, 50 }, { 0, 3, 1 }, { 0, 127, 64 }, { 0, 127, 64 }, { 0, 100, 40 },
+static const gb_pd ED[8] = { { 0, 3, 0 }, { 0, 100, 50 }, { 0, 3, 1 }, { 0, 127, 64 }, { 0, 127, 64 }, { 0, 100, 10 },
                              { 0, 100, 80 }, { 0, 100, 0 } };
 GB_INLINE int ev(const gb_patch *p, int k) { return gb_iv(p->p[k], ED[k].min, ED[k].max); }
 

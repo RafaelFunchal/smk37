@@ -29,7 +29,7 @@ verbatim), cut down by `tools/mkpiano.py` and read in place from the flash windo
 | E2 | TOUCH | SOFT NORMAL HARD FIXED (NORMAL) | Erik37's touch curves (exponents 0.55, 0.95, 1.7; FIXED plays every note at velocity 100) |
 | E3 | DECAY | 0..127 (64) | Held decay length × 0.25..4 (both slopes and the knee) |
 | E4 | DAMPER | 0..127 (64) | Release length × 0.25..4 (both damper stages) |
-| E5 | NOISE | 0..100 (40) | Release noise level (40 is Erik37's default; 100 is its 1.1 level) |
+| E5 | NOISE | 0..100 (10) | Release noise level (10 here: -12 dB from Erik37's default of 40, which was heard as too loud; 0 is none at all; 100 is Erik37 1.1's level) |
 | E6 | WIDTH | 0..100 (80) | Spread of the keys across the stereo field |
 | E7 | UNA CORDA | 0..100 (0) | Soft pedal held at this depth: a softer hammer, a quieter and darker note |
 
