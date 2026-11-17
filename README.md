@@ -1,5 +1,12 @@
 # SLOOP 3
 
+> **This repository: SLOOP 3 on the M-VAVE SMK-37, with a sampled grand piano.** A port of
+> [isod89/sloop3-fm1](https://github.com/isod89/sloop3-fm1) (SLOOP 3.3.7) to the SMK-37's keyboard, pads, faders and
+> wheels, plus the PIANO engine from [Erik37](https://github.com/genkigenki/erik37), keyboard layers and a split.
+> **Start with [SMK37.md](SMK37.md).** Untested on a real unit yet. The FM-1 build is unchanged; the rest of this
+> README is SLOOP 3's own.
+
+
 **A free groovebox firmware for the M-VAVE FM-1, rewritten from scratch.** Five tracks, 13 sound engines, 153
 sounds, 46 drum kits, a step sequencer with a piano roll, 27 punch-in effects, six visualisers and a web editor.
 
