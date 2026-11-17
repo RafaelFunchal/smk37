@@ -1112,7 +1112,15 @@ COLD static void fill_view(ui_view *v)
     v->ntrk = NTRK; v->trk = POS[trk];
     v->blink = (uint8_t)((now / (250000u * lsb)) & 1u);
     v->batt = batt_pct < 0 ? 255u : (uint8_t)batt_pct;
+#if BOARD_SMK37
+    /* (a computer: it powers and charges) the light runs at the tempo, a step an eighth note, a sweep a bar: playing,
+     * on the sequencer's own eighths (a sweep from each bar's first beat), and the count-in's; stopped, at the tempo the knob sets */
+    if (!usb_midi_ready()) v->batt_usb = 0u;
+    else if (Q.playing || countin) v->batt_usb = (uint8_t)(1u + ((Q.playing ? Q.tick : cin_ticks) / (2u * SEQ_TPS) & 7u));
+    else { float bpm = Q.bpm > 20.0f ? Q.bpm : 120.0f; v->batt_usb = (uint8_t)(1u + ((now / ((uint32_t)(30000000.0f / bpm) * lsb)) & 7u)); }
+#else
     v->batt_usb = usb_midi_ready() ? (uint8_t)(1u + ((now / (250000u * lsb)) & 7u)) : 0u;   /* (a computer: it powers and charges) */
+#endif
     v->bpm = (uint16_t)(Q.bpm + 0.5f);
     v->bar = (uint16_t)(Q.tick / SEQ_BAR + 1u); v->beat = (uint8_t)(Q.tick / (4 * SEQ_TPS) % 4u + 1u);
     v->playing = (uint8_t)Q.playing; v->recording = (uint8_t)Q.recording; v->armed = (uint8_t)recording_armed;

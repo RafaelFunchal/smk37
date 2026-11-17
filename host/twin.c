@@ -2295,6 +2295,22 @@ static void sc_smk(void)
     /* K1, MASTER: turned, the screen says the volume */
     { extern int tw_pot; m = msg_mark(); int p0 = tw_pot; tw_pot = p0 + 48; wait_ms(120);
       EXPECT(said_since(m, "VOLUME "), "K1 (MASTER) turned: no VOLUME on the screen"); tw_pot = p0; wait_ms(120); }
+    /* the USB light along the bottom: at the tempo (an eighth a step), on the sequencer's eighths while it plays */
+    { float b0 = Q.bpm; int steps[2];
+      for (int k = 0; k < 2; k++) {
+          seq_set_bpm(&Q, k ? 60.0f : 120.0f); wait_ms(300);
+          int n = 0, last = V.batt_usb; for (int i = 0; i < 200; i++) { wait_ms(10); if (V.batt_usb != last) { n++; last = V.batt_usb; } }
+          steps[k] = n;
+      }
+      printf("[%8.3f]    the USB light, stopped: %d steps in 2 s at 120 BPM, %d at 60\n", tw_s(), steps[0], steps[1]);
+      EXPECT(steps[0] >= 7 && steps[0] <= 9, "the USB light at 120 BPM: %d steps in 2 s (8: an eighth a step)", steps[0]);
+      EXPECT(steps[1] >= 3 && steps[1] <= 5, "the USB light at 60 BPM: %d steps in 2 s (4)", steps[1]);
+      seq_set_bpm(&Q, 120.0f); tap(B_PLAY); wait_ms(200);
+      int ok = 0, all = 0;
+      for (int i = 0; i < 150; i++) { wait_ms(10); if (!Q.playing) continue; all++;
+          int want = (int)(1u + (Q.tick / (2u * SEQ_TPS) & 7u)), d = (V.batt_usb - want + 8) % 8; ok += d == 0 || d == 7; }
+      tap(B_PLAY); wait_ms(200); seq_set_bpm(&Q, b0);
+      EXPECT(all > 100 && ok == all, "the USB light while playing: off the sequencer's eighths (%d of %d)", ok, all); }
     /* HOME > SCREEN > TEXT: LARGE (kept with the project, sc_smk_reboot) */
     m = msg_mark(); home_knob(1, 2, 1); wait_ms(100);
     EXPECT(ui_large == 1 && said_since(m, "TEXT: LARGE"), "HOME > SCREEN > TEXT: not LARGE (%d)", ui_large);
