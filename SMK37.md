@@ -83,8 +83,8 @@ A button or a knob says its printed name (a knob: which way and how far). The ke
 
 ## Larger text
 
-HOME (PATCH) held + SCALE: the settings menu; on its SCREEN page, **TEXT: LARGE** draws the screen's small type a step
-larger (capitals 16 px instead of 13): the knobs' names, the page names, the tiles, the track list, the messages. Kept
+Hold **PATCH** (HOME), turn **K2** to *SCREEN 1/4*, then turn **K7** (its third knob): **TEXT: LARGE** draws the
+screen's small type a step larger (capitals 16 px instead of 13): the knobs' names, the page names, the tiles, the track list, the messages. Kept
 with the project. Where a text has no room for it (the stacked lists of values, a line the large type would push its
 neighbour off), it stays as it was: nothing is cut or overlaps that was not before. TEXT: NORMAL is the screen as
 SLOOP 3 draws it on the FM-1.
