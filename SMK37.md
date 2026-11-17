@@ -50,7 +50,8 @@ names for the buttons and K5..K8 for KNOB 1..4.
 | KNOB BANK held + a key | the split point at that key (keys below it go to the SPLIT's track); the same key again: no split |
 | FADER BANK | the faders' bank: A level, B filter, C reverb, D delay of synth tracks 1-4; E the drums' level, filter, reverb, delay (its light on off bank A; OCTAVE- held: back) |
 | Faders 1-4 | the bank's four; a fader takes over once it reaches the value (no jump) |
-| < / > | the previous / next track; with SEQ held or on STEPS: the step page |
+| < / > | the previous / next track; with SEQ held or on STEPS: the step page (each acts when let go) |
+| < and > together | SMK-37 SETTINGS, again: PANEL TEST, again: back where you were |
 | K1 | MASTER (the volume) |
 | K2 / K3 / K4 | SELECT / ALGORITHM / PRESETS |
 | K5..K8 | KNOB 1..4 |
@@ -63,6 +64,43 @@ names for the buttons and K5..K8 for KNOB 1..4.
 | USB | MIDI and audio as on the FM-1, named "SMK-37 SLOOP 3" (the web editor finds it) |
 
 Power-on: **OCTAVE-** held, RESCUE (an empty project; yours is kept); **SEQ PLAY** held, m-bootloader's menu.
+
+## SMK-37 SETTINGS and PANEL TEST
+
+Press **<** and **>** together. Saved with the project.
+
+| Knob | Setting | |
+|---|---|---|
+| K5 | TOUCH | the keys' and the pads' velocity: DYNAMIC (your unit's factory curves), SOFT, HARD, FIX 64, FIX 100, FIX 127 |
+| K6 | PADS | how firm a pad hit must be: LOW, MID (default), HIGH, MAX. Pads that fire twice or by themselves: higher |
+| K7 | LIGHT | the pads' brightness: 100 %, 50 %, 25 % |
+| K8 | KNOBS | NORMAL, or REVERSE if every knob turns the wrong way on your unit |
+
+**PANEL TEST** (< and > together again) shows every input as the keyboard reads it, and does nothing with the buttons:
+the 16 tiles are the pads (their force 0..1023 as a number and a bar, lit while held), the dials the faders (0..127),
+the top line the last key or pad with its velocity, the pitch wheel (W), mod wheel (M) and pedal (P) as raw readings.
+A button or a knob says its printed name (a knob: which way and how far). The keys still play. < and > together: back.
+
+## First install: what to check
+
+After installing, in this order (each step is a minute). If something is off, note what PANEL TEST shows.
+
+1. **It starts:** the SLOOP logo, then the tracks. If not: switch on holding OCTAVE- (RESCUE), or hold SEQ PLAY for
+   m-bootloader's menu, and tell what the screen says.
+2. **PANEL TEST** (< and > together, twice):
+   - every button names itself (18), every knob K2..K8 names itself turning right as RIGHT (K1 is the volume);
+   - all 37 keys: the top line names each, soft and hard strokes give low and high V;
+   - the pads: each tile rises when pressed, the top row is pads 1-8; resting, the numbers stay low and steady;
+   - the faders 0 at the bottom, 127 at the top; the wheels and the pedal move their numbers.
+3. **Sound:** a track on CONCERT, chords with the sustain pedal; then PLAY the demo.
+4. **The load:** hold PATCH: the header shows the audio load (CPU, PEAK, LATE). Play a full pattern with piano chords
+   on top: PEAK under ~85 % and LATE not rising is good.
+5. **Saving:** BT twice (save), switch off and on: your project comes back.
+6. **Lights:** pads in the track's colour; KNOB BANK's, FADER BANK's and SEQ PLAY's lights.
+
+Settings to try if something is off: knobs backwards, KNOBS REVERSE; pads too eager or too stiff, PADS; velocity too
+loud or soft, TOUCH. Things worth reporting: a knob or button with the wrong name, a key or pad that never shows, pads
+firing at rest, PEAK near 100 %, the screen or the pads' colours wrong.
 
 ## Layers and splits
 
@@ -101,14 +139,14 @@ keeps 2 of Erik37's 3 velocity layers and plays its lowest keys (A0..C#1) from t
 - **One sample slot (USR1)**; USR2-4 are refused by the editor. The flash holds the piano instead.
 - **SLOOP 2.8's data is not imported** (it is the FM-1's; SLOOP Pro's projects are another format).
 - No TRS MIDI IN (the SMK-37 has none), no Bluetooth (its radio needs M-VAVE's closed SDK).
-- Not yet: a KEY VELOCITY setting (dynamic, from the factory curves), the pads' threshold and brightness settings.
+- RAM and flash are nearly full: 1 KB of RAM and ~15 KB of flash room left for the SMK-37's code.
 
 ## The flash
 
 | Range | |
 |---|---|
-| `0x04000-0x77FFF` | SLOOP 3, enciphered, as on the FM-1 (an install writes it) |
-| `0x78000-0xB5FFF` | the piano bank, in clear (an install writes it) |
+| `0x04000-0x7BFFF` | SLOOP 3 and its sample bank (at `0x4C000`, 16 KB later than on the FM-1), enciphered (an install writes it) |
+| `0x7C000-0xB9FFF` | the piano bank, in clear (an install writes it) |
 | `0xC0000-0xC1FFF` | Bluetooth pairing and **the factory calibration**: never written (m-bootloader and SLOOP 3 both refuse) |
 | `0xC2000-0xD5FFF` | your sample slot USR1 |
 | `0xD6000-0xF3FFF` | your FM6 bank, SYN kits, project, sounds: out of an install's reach, kept by updates |

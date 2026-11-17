@@ -2105,6 +2105,8 @@ static void sc_sounds(void)
 void tw_ext(int key, int vel); void tw_pedal(int down); void tw_pad(int pad, int vel);
 extern int tw_vel[27], tw_fader[4], tw_padmode, tw_smk_bad_writes; extern float tw_bend, tw_mod; extern uint32_t tw_xbtn, tw_tint;
 extern uint8_t tw_trs[4096]; extern uint32_t tw_trs_n;
+extern int tw_vel_mode, tw_pad_sens, tw_knob_rev;
+static void lr_together(void) { tw_xbtn |= (1u << SB_LEFT); wait_ms(40); tw_xbtn |= (1u << SB_RIGHT); wait_ms(60); tw_xbtn &= ~((1u << SB_LEFT) | (1u << SB_RIGHT)); wait_ms(150); }
 static int sounding(int t, int note)            /* a voice of track t on that note, not released */
 {
     for (int i = 0; i < GB_NVOICE; i++) if (S.v[i].state == V_ON && S.v[i].track == t && S.v[i].note == note) return 1;
@@ -2118,7 +2120,7 @@ static void sc_smk(void)
     boot_wait();
     for (int i = 0; i < 400 && splash_on; i++) wait_ms(10);
     EXPECT(tw_audio_on, "SMK-37: no sound started");
-    EXPECT(piano_bank_ok(), "SMK-37: the piano bank at 0x78000 not taken");
+    EXPECT(piano_bank_ok(), "SMK-37: the piano bank (SMK_PIANO_AT) not taken");
     EXPECT(GB_NVOICE == 24, "SMK-37: %d voices", GB_NVOICE);
     int t = synth_trk(); select_track(t); trk = t; oct = 0; wait_ms(100);
     /* the PIANO: a factory sound, heard, louder with the velocity */
@@ -2262,11 +2264,52 @@ static void sc_smk(void)
     for (int i = 0; i < 8 && smk_lower != t3; i++) turn(ENC_PRESETS, 1);
     tw_xbtn &= ~(1u << SB_KNOB_BANK); wait_ms(150);
     EXPECT(smk_layer == t2 && smk_lower == t3 && smk_split == 5, "KEYS set again: %d %d %d", smk_layer, smk_lower, smk_split);
+    /* < and > together: SMK-37 SETTINGS, then PANEL TEST, then back */
+    select_track(t); trk = t; tap(B_HOME); wait_ms(100);
+    int pg0 = sticky, tr0 = trk;
+    lr_together();
+    EXPECT(sticky == PG_SMKSET && trk == tr0, "< > together: not the settings (page %d, track %d)", sticky, trk);
+    wait_ms(100); shot("smk-settings");
+    turn(ENC_KNOB1, 2); turn(ENC_KNOB2, 1); turn(ENC_KNOB3, 1); turn(ENC_KNOB4, 1);
+    wait_ms(100); shot("smk-settings-set");
+    EXPECT(smk_kv == KV_HARD && tw_vel_mode == KV_HARD, "KEY VEL: %d (the panel %d)", smk_kv, tw_vel_mode);
+    EXPECT(smk_sens == 2 && tw_pad_sens == 2, "PAD SENS: %d (the panel %d)", smk_sens, tw_pad_sens);
+    EXPECT(smk_light == 1 && smk_krev == 1 && tw_knob_rev == 1, "PAD LIGHT %d, KNOBS %d (the panel %d)", smk_light, smk_krev, tw_knob_rev);
+    lr_together();
+    EXPECT(sticky == PG_SMKTEST, "< > again: not PANEL TEST (%d)", sticky);
+    m = msg_mark(); tap(B_HOME); wait_ms(80);
+    EXPECT(sticky == PG_SMKTEST && said_since(m, "BUTTON PATCH"), "PANEL TEST: PATCH not named, or it left the page (%d)", sticky);
+    m = msg_mark(); tap(B_PLAY); wait_ms(80);
+    EXPECT(!Q.playing && said_since(m, "BUTTON SEQ PLAY"), "PANEL TEST: SEQ PLAY played, or was not named");
+    m = msg_mark(); turn(ENC_KNOB2, 3);
+    EXPECT(said_since(m, "KNOB K6 RIGHT"), "PANEL TEST: K6 not named");
+    m = msg_mark(); xtap(SB_FADER_BANK);
+    EXPECT(said_since(m, "BUTTON FADER BANK") && smk_fbank == 0, "PANEL TEST: FADER BANK not named, or it changed the bank");
+    tw_pad(3, 90); wait_ms(60); shot("smk-panel-test"); tw_pad(3, 0); wait_ms(60);
+    lr_together();
+    EXPECT(sticky == pg0, "< > a third time: not back (%d, was %d)", sticky, pg0);
     /* the project saved: only the SMK-37's data range written */
     select_track(t); trk = t;
     save_and_wait();
     EXPECT(tw_smk_bad_writes == 0, "%d writes outside the SMK-37's range", tw_smk_bad_writes);
     EXPECT(!memcmp(tw_flash + SMK_TRIM_AT + 0x224, "trimdat", 8), "the calibration's marker changed");
+}
+/* the SMK-37's data range full of what another firmware left there (M-VAVE's presets, SLOOP Pro's samples): random
+ * bytes, a few blank and zeroed sectors. It starts, finds no project, plays, and saves over it */
+static void sc_smk_leftover(void)
+{
+    boot_wait();
+    for (int i = 0; i < 400 && splash_on; i++) wait_ms(10);
+    EXPECT(tw_audio_on, "leftover data: no sound started");
+    EXPECT(proj_used == 0, "leftover data: a project read out of noise");
+    EXPECT(piano_bank_ok(), "leftover data: the piano lost");
+    int t = synth_trk(); select_track(t); trk = t;
+    keydown(7); double pk = peak_over(300); keyup(7);
+    EXPECT(pk > 0.001, "leftover data: a key plays nothing (%.4f)", pk);
+    tap(B_PLAY); wait_ms(1500); tap(B_PLAY); wait_ms(300);
+    save_and_wait();
+    EXPECT(proj_used != 0 && tw_smk_bad_writes == 0, "leftover data: not saved over it (%d, %d bad writes)", proj_used, tw_smk_bad_writes);
+    check_project_roundtrip("leftover data, after the save");
 }
 static void sc_smk_reboot(void)                  /* after sc_smk's flash: the project comes back, the piano too */
 {
@@ -2276,6 +2319,7 @@ static void sc_smk_reboot(void)                  /* after sc_smk's flash: the pr
     EXPECT(piano_bank_ok(), "SMK-37: the piano lost");
     int t = synth_trk();
     EXPECT(S.trk[t].patch.engine == ENG_PIANO, "SMK-37: the track's piano not kept (engine %d)", S.trk[t].patch.engine);
+    EXPECT(smk_kv == KV_HARD && smk_sens == 2 && smk_light == 1 && smk_krev == 1, "SMK-37: the settings not kept (%d %d %d %d)", smk_kv, smk_sens, smk_light, smk_krev);
     EXPECT(smk_layer == smk_trk_shown(1) && smk_lower == smk_trk_shown(2) && smk_split == 5, "SMK-37: KEYS not kept with the project (layer %d, split's track %d, split %d)", smk_layer, smk_lower, smk_split);
     keydown(9); wait_ms(80);
     EXPECT(sounding(t, 62) && sounding(smk_layer, 62), "SMK-37: after the restart, the layer not heard");
@@ -2291,7 +2335,7 @@ static const struct { const char *name; void (*fn)(void); } SC[] = {
     { "powercut", sc_powercut }, { "aftercut", sc_after_cut }, { "sample", sc_sample }, { "editor", sc_editor },
     { "monkey", sc_monkey }, { "import", sc_import }, { "midi", sc_midi }, { "rescue", sc_rescue }, { "calib", sc_calib }, { "settings", sc_settings }, { "play", sc_play }, { "levels", sc_levels }, { "mixui", sc_mixui }, { "fx", sc_fx }, { "editor2", sc_editor2 }, { "serve", sc_serve }, { "vis", sc_vis }, { "banksave", sc_banksave }, { "punch", sc_punch }, { "film", sc_film }, { "inst", sc_inst }, { "film2", sc_film2 }, { "bigproj", sc_bigproj }, { "bigcut", sc_bigcut }, { "punch2", sc_punch2 }, { "crumb", sc_crumb }, { "nan", sc_nan }
 #if BOARD_SMK37
-    , { "smk", sc_smk }, { "smk-reboot", sc_smk_reboot }
+    , { "smk", sc_smk }, { "smk-reboot", sc_smk_reboot }, { "smk-leftover", sc_smk_leftover }
 #endif
 };
 static void (*tw_sc)(void);
@@ -2341,6 +2385,11 @@ int main(int argc, char **argv)
         size_t n = fread(tw_flash + 0x4000, 1, SMK_PIANO_AT - 0x4000, a); fclose(a); (void)n;
         n = fread(tw_flash + SMK_PIANO_AT, 1, SMK_PIANO_END - SMK_PIANO_AT, pf); fclose(pf); (void)n;
         memcpy(tw_flash + SMK_TRIM_AT + 0x224, "trimdat", 8);   /* (the unit's calibration record: never written) */
+        if (!strcmp(argv[1], "smk-leftover")) {                    /* (another firmware's data where ours goes) */
+            uint64_t r = tw_seed | 1u;
+            for (uint32_t a = SMK_WRITE_LO; a < SMK_WRITE_HI; a++) { r ^= r << 13; r ^= r >> 7; r ^= r << 17; tw_flash[a] = (uint8_t)r; }
+            for (uint32_t a = SMK_WRITE_LO; a < SMK_WRITE_HI; a += 0x7000u) memset(tw_flash + a, (a >> 12) & 1u ? 0x00 : 0xFF, 4096);
+        }
 #else
         FILE *a = fopen("build/fw/fw.area", "rb");
         if (!a) { fprintf(stderr, "build/fw/fw.area: build the firmware first\n"); return 2; }

@@ -8,7 +8,7 @@ const fs = require('fs');
  * --wrong-unit: the other board's unit answers: the page must refuse it, with nothing sent to write */
 const args = process.argv.slice(2), wrong = args.includes('--wrong-unit'), pos = args.filter(a => a !== '--wrong-unit');
 const [page, areaFile] = pos, BOARD = pos[2] || 'fm1', SMK = BOARD === 'smk37';
-const PIANO = SMK ? require('fs').readFileSync(pos[3]) : null;
+const PIANO = SMK ? require('fs').readFileSync(pos[3]) : null, PIANO_AT = 0x7C000;   /* (hal/smk37/smk37.h SMK_PIANO_AT) */
 const html = fs.readFileSync(page, 'utf8');
 const js = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
 const AREA = fs.readFileSync(areaFile);
@@ -98,11 +98,11 @@ async function install() {
   const a = fb.slice(0x4000, 0x4000 + AREA.length);
   for (let q = 0; q < a.length; q += 32) enc(a, q, Math.min(32, a.length - q), KEY ^ ((q >> 2) & 0xFFFF));
   check(Buffer.compare(Buffer.from(a), AREA) === 0, 'the decrypted area is fw.area');
-  const tailAt = SMK ? 0x78000 : size;
+  const tailAt = SMK ? PIANO_AT : size;
   for (let i = 0x4000 + AREA.length; i < tailAt; i++) if (fb[i] !== 0xFF) { check(false, 'padding'); break; }
   if (SMK) {
-    check(Buffer.compare(Buffer.from(fb.slice(0x78000, 0x78000 + PIANO.length)), PIANO) === 0, 'the piano bank at 0x78000, in clear');
-    for (let i = 0x78000 + PIANO.length; i < size; i++) if (fb[i] !== 0xFF) { check(false, 'padding after the piano'); break; }
+    check(Buffer.compare(Buffer.from(fb.slice(PIANO_AT, PIANO_AT + PIANO.length)), PIANO) === 0, 'the piano bank at its place, in clear');
+    for (let i = PIANO_AT + PIANO.length; i < size; i++) if (fb[i] !== 0xFF) { check(false, 'padding after the piano'); break; }
   }
   await read(0xF0000000, 8);
   setTimeout(() => {

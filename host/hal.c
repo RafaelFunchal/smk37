@@ -401,7 +401,8 @@ static int pedq[16]; static uint32_t ped_r, ped_w;
 void tw_ext(int key, int vel) { extq[ext_w++ & 63] = (uint16_t)(key << 8 | vel); }
 void tw_pedal(int down) { pedq[ped_w++ & 15] = down; }
 int smk_key_vel(int k) { return k >= 0 && k < 27 && tw_vel[k] ? tw_vel[k] : 100; }
-void smk_vel_mode(int mode) { (void)mode; }
+int tw_vel_mode;
+void smk_vel_mode(int mode) { tw_vel_mode = mode; }
 int smk_ext_take(void) { return ext_r == ext_w ? -1 : extq[ext_r++ & 63]; }
 uint32_t smk_xbuttons(void) { return tw_xbtn; }
 uint32_t smk_xbutton_edges(uint32_t *rel) { uint32_t p = tw_xbtn & ~tw_xbtn_seen; *rel = tw_xbtn_seen & ~tw_xbtn; tw_xbtn_seen = tw_xbtn; return p; }
@@ -427,6 +428,13 @@ void tw_pad(int pad, int vel)
     if (vel) { tw_vel[WN[pad]] = vel; tw_keys |= 1u << WN[pad]; } else tw_keys &= ~(1u << WN[pad]);
 }
 int smk_trim_read(void) { return 0; }
+int tw_pad_sens = 1, tw_knob_rev, tw_last_hit;
+void smk_pad_sens(int l) { tw_pad_sens = l; }
+void smk_knob_dir(int r) { tw_knob_rev = r; }
+int smk_pad_raw(int p) { return p >= 0 && p < 16 && ((pad_down >> p) & 1u) ? 700 : 100; }
+int smk_wheel_raw(int w) { return w ? 600 : 535; }
+int smk_pedal_raw(void) { return 985; }
+int smk_last_hit(void) { return pad_down ? (0x40 + __builtin_ctz(pad_down)) << 8 | 90 : tw_last_hit; }
 void smk_stats(uint32_t *f, uint32_t *ok, uint32_t *miss) { *f = 0; *ok = 0; *miss = 0; }
 int smk_enc_take(int k) { (void)k; return 0; }
 void trs_midi_send(const uint8_t *b, int n) { for (int i = 0; i < n; i++) if (tw_trs_n < sizeof tw_trs) tw_trs[tw_trs_n++] = b[i]; }
