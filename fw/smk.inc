@@ -424,21 +424,73 @@ COLD static void smk_kind_step(int d)                          /* UP, DOWN: the 
         return;
     }
 }
+/* a slot keeps the sound of the track played (place k, 1-8) and, if they are on, the layer's and the split's (places
+ * 9-24: two a slot), with their tracks and the split point in its record's 4 spare bytes (76..79: 0xC5, the layer's
+ * track + 1, the split's track + 1, the split point + 64; 0 none). Tapped, all of it comes back: the sounds on their
+ * tracks, the layer and the split on; a slot kept without them (or kept before) turns them off (parked: LAYER, SPLIT) */
+#define SMK_SLOT_META 76
+COLD static int smk_part_place(int k, int split) { return 8 + 2 * k + split; }
+COLD static void smk_take_sound(int t, int k, us_sound *u)    /* as user_save: track t's sound as place k's */
+{
+    int po = preset_origin(preset_of[t]);
+    char nm[13]; const char *src = po >= 0 ? snd_name(po) : 0;
+    if (!src || !src[0]) { char *p = put_s(nm, "USER "); p = put_u(p, (uint32_t)k + 1u); *p = 0; src = nm; }
+    us_take(&S, t, base[t], src, u);
+    u->kind = (uint8_t)(po >= 0 && po < gb_npresets ? gb_presets[po].kind : K_FX); u->trans = harm[t].transpose;
+    if (arpc[t].mode != AM_OFF) {
+        int m = 0, r = 2; while (m < 15 && SL_AMODE[m] != arpc[t].mode) m++;
+        for (int i = 0; i < 6; i++) if (SL_ARATE[i] == arpc[t].rate) r = i;
+        u->arp[0] = (uint8_t)(m < 15 ? m + 1 : 2); u->arp[1] = (uint8_t)(r + 1); u->arp[2] = (uint8_t)(arpc[t].oct + 1);
+        u->arp[3] = (uint8_t)(arpc[t].gate * 127 / 100 + 1);
+    }
+}
 COLD static void smk_slot_tap(int k)
 {
     char b[64], *p = put_u(put_s(b, "SLOT "), (uint32_t)k + 1u);
     if (is_drum(trk)) { say_bad("SLOTS: THE SYNTH TRACKS' SOUNDS"); return; }
     if (!us_used(k)) { p = put_s(p, " EMPTY · HOLD 2 S TO KEEP"); *p = 0; say(b); return; }
-    if (!apply_user(trk, k)) { say_bad(saving ? "SAVING · AGAIN IN A MOMENT" : "USER SOUND UNREADABLE"); return; }
-    p = put_s(put_s(p, " · "), us_name(k)); *p = 0; say_imp(b);
+    if (!us_bank()) { say_bad(saving ? "SAVING · AGAIN IN A MOMENT" : "USER SOUND UNREADABLE"); return; }
+    uint8_t m[4]; for (int i = 0; i < 4; i++) m[i] = sbuf[8 + k * US_REC + SMK_SLOT_META + i];
+    if (!apply_user(trk, k)) { say_bad("USER SOUND UNREADABLE"); return; }
+    int combo = m[0] == 0xC5;
+    int L = combo && m[1] >= 1 && m[1] <= NTRK ? m[1] - 1 : -1, D = combo && m[2] >= 1 && m[2] <= NTRK ? m[2] - 1 : -1;
+    int at = combo && m[3] >= 64 - 5 && m[3] <= 64 + 31 ? m[3] - 64 : -100;
+    if (L == trk || (L >= 0 && is_drum(L))) L = -1;           /* (the track played now is the slot's own: that part left out) */
+    if (D == trk || at == -100) D = -1;
+    if (L >= 0) { int pl = smk_part_place(k, 0); if (us_used(pl)) apply_user(L, pl); smk_layer = (int8_t)L; }
+    else if (smk_layer >= 0) { smk_layer_park = smk_layer; smk_layer = -1; }
+    if (D >= 0) { int pl = smk_part_place(k, 1); if (!is_drum(D) && us_used(pl)) apply_user(D, pl); smk_lower = (int8_t)D; smk_split = (int8_t)at; }
+    else if (smk_split > -100 && smk_lower >= 0) { smk_split_park = smk_split; smk_lower_park = smk_lower; smk_split = -100; }
+    p = put_s(put_s(p, " · "), us_name(k));
+    if (L >= 0) p = put_s(p, " + LAYER");
+    if (D >= 0) p = put_s(p, " + SPLIT");
+    *p = 0; say_imp(b);
 }
 COLD static void smk_slot_keep(int k)
 {
     if (is_drum(trk)) { say_bad("SLOTS: THE SYNTH TRACKS' SOUNDS"); return; }
     if (saving) { say_bad("SAVING · AGAIN IN A MOMENT"); return; }
-    char b[64], *p = put_u(put_s(b, "SLOT "), (uint32_t)k + 1u); p = put_s(p, " · KEEPING "); p = put_s(p, smk_snd_name(trk)); *p = 0;
-    user_save(k, 0);
-    if (saving) say(b);                                        /* ("USER SOUNDS SAVED" once written) */
+    if (!us_bank()) { say_bad("NO FLASH"); return; }
+    int L = smk_layer >= 0 && smk_layer < NTRK && smk_layer != trk && !is_drum(smk_layer) ? smk_layer : -1;
+    int sp = smk_split > -100 && smk_lower >= 0 && smk_lower < NTRK && smk_lower != trk, D = sp ? smk_lower : -1;
+    int p0 = smk_part_place(k, 0), p1 = smk_part_place(k, 1);
+    us_sound u;
+    smk_take_sound(trk, k, &u); us_put(sbuf, k, &u);
+    if (L >= 0) { smk_take_sound(L, p0, &u); us_put(sbuf, p0, &u); } else us_put(sbuf, p0, 0);
+    if (D >= 0 && D != L && !is_drum(D)) { smk_take_sound(D, p1, &u); us_put(sbuf, p1, &u); } else us_put(sbuf, p1, 0);   /* (the layer's track: once) */
+    uint8_t *r = sbuf + 8 + k * US_REC + SMK_SLOT_META;      /* (after us_put: it clears the record) */
+    r[0] = 0xC5; r[1] = (uint8_t)(L + 1); r[2] = (uint8_t)(D + 1); r[3] = (uint8_t)(sp ? smk_split + 64 : 0);
+    us_fav_put(sbuf);
+    if (store_sounds_begin(sbuf, US_FILE)) { say_bad("SAVE: ERROR"); return; }
+    us_from_bytes(sbuf, US_FILE);
+    saving = 1; saving_shown = 1; saving_snd = 1;
+    preset_of[trk] = US_BASE + k;
+    if (L >= 0) preset_of[L] = US_BASE + p0;
+    if (D >= 0 && D != L && !is_drum(D)) preset_of[D] = US_BASE + p1;
+    char b[64], *p = put_u(put_s(b, "SLOT "), (uint32_t)k + 1u); p = put_s(p, " · KEEPING "); p = put_s(p, smk_snd_name(trk));
+    if (L >= 0) p = put_s(p, " +L");
+    if (D >= 0) p = put_s(p, " +S");
+    *p = 0; say(b);                                            /* ("USER SOUNDS SAVED" once written) */
 }
 /* a pad's press or release from the queue: 1 if it was a control's */
 COLD static int smk_ctl_pad(int pad, int vel)

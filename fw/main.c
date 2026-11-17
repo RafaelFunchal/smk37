@@ -3534,6 +3534,9 @@ COLD static int snd_load(int f)                          /* a sound onto the tra
 COLD static void user_save(int k, int erase)            /* USER SOUNDS: the track's sound into place k (or erased) */
 {
     if (is_drum(trk)) return;
+#if BOARD_SMK37
+    if (k >= 8 && k < 24) { say_bad("9-24: KEPT FOR THE PAD SLOTS"); return; }   /* (the slots' layers and splits: fw/smk.inc) */
+#endif
     if (!us_bank()) { say_bad(saving ? "SAVING" : "NO FLASH"); return; }
     if (erase) us_put(sbuf, k, 0);
     else {
