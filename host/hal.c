@@ -166,8 +166,22 @@ int flash_busy(void)
     finish(); win_set(0); return 0;
 }
 void flash_wait_idle(void) { while (flash_busy()) { } }
+#if BOARD_SMK37
+#include "../hal/smk37/smk37.h"
+int tw_smk_bad_writes;                                   /* writes the SMK-37's allow-list refuses (none expected) */
+static int smk_guard(uint32_t a, uint32_t n)
+{
+    if (smk_flash_writable(a, n)) return 0;
+    tw_smk_bad_writes++;
+    fprintf(stderr, "TWIN: SMK-37: a write outside 0x%X..0x%X at 0x%X (%u bytes): refused\n", SMK_WRITE_LO, SMK_WRITE_HI, a, n);
+    return -1;
+}
+#else
+static int smk_guard(uint32_t a, uint32_t n) { (void)a; (void)n; return 0; }
+#endif
 int flash_erase_start(uint32_t a)
 {
+    if (smk_guard(a, 4096u)) return -1;                  /* (the SMK-37: as hal/fm1/flash.c with BOARD_SMK37) */
     if ((a & 4095u) || a >= TW_FLASH || flash_busy()) return -1;
     if (a < 0x4000u) { fprintf(stderr, "TWIN: an erase of m-bootloader's sector 0x%X\n", a); twin_fail_hook(); exit(71); }
     twin_flash_op(1, a, 4096);
@@ -180,6 +194,7 @@ int flash_erase_start(uint32_t a)
 }
 int flash_program_start(uint32_t a, const void *src, uint32_t n)
 {
+    if (smk_guard(a, n)) return -1;
     if (!n || (a & 255u) + n > 256u || a + n > TW_FLASH || flash_busy()) return -1;
     if (a < 0x4000u) { fprintf(stderr, "TWIN: a write to m-bootloader at 0x%X\n", a); twin_fail_hook(); exit(71); }
     twin_flash_op(2, a, n);
@@ -370,3 +385,50 @@ int tw_pot = 512;
 void adc_init(void) { }
 int32_t tw_batt = 600;                     /* (3.3.6) the battery's ADC: 4.06 V, about 85 % */
 int32_t adc_read(uint32_t ch) { adv(200000); return ch == 3u ? tw_batt : tw_pot; }   /* (ch 3: ADC_CH_BATT) */
+
+#if BOARD_SMK37
+/* ---- the SMK-37's panel beyond the FM-1's (hal/smk37/smk_panel.h), as the scenarios set it */
+#include "../hal/smk37/smk_panel.h"
+int tw_vel[27];                                          /* each note key's velocity (0: 100) */
+uint32_t tw_xbtn, tw_xbtn_seen;
+int tw_fader[4] = { -1, -1, -1, -1 };
+float tw_bend, tw_mod;
+int tw_padmode;                                          /* smk_pad_mode: 1 DRUM PADS */
+uint32_t tw_tint; uint8_t tw_xled[19];
+uint8_t tw_trs[4096]; uint32_t tw_trs_n;                 /* the TRS jack's bytes */
+static uint16_t extq[64]; static uint32_t ext_r, ext_w;
+static int pedq[16]; static uint32_t ped_r, ped_w;
+void tw_ext(int key, int vel) { extq[ext_w++ & 63] = (uint16_t)(key << 8 | vel); }
+void tw_pedal(int down) { pedq[ped_w++ & 15] = down; }
+int smk_key_vel(int k) { return k >= 0 && k < 27 && tw_vel[k] ? tw_vel[k] : 100; }
+void smk_vel_mode(int mode) { (void)mode; }
+int smk_ext_take(void) { return ext_r == ext_w ? -1 : extq[ext_r++ & 63]; }
+uint32_t smk_xbuttons(void) { return tw_xbtn; }
+uint32_t smk_xbutton_edges(uint32_t *rel) { uint32_t p = tw_xbtn & ~tw_xbtn_seen; *rel = tw_xbtn_seen & ~tw_xbtn; tw_xbtn_seen = tw_xbtn; return p; }
+void smk_xled(int sb, int on) { if (sb >= 0 && sb < 19) tw_xled[sb] = (uint8_t)on; }
+int smk_fader(int i) { return i >= 0 && i < 4 ? tw_fader[i] : -1; }
+float smk_bend(void) { return tw_bend; }
+float smk_mod(void) { return tw_mod; }
+int smk_pedal_take(void) { return ped_r == ped_w ? -1 : pedq[ped_r++ & 15]; }
+int smk_batt_raw(void) { return 600; }
+void smk_pad_tint(uint32_t rgb) { tw_tint = rgb; }
+void smk_pad_color(int pad, uint32_t rgb) { (void)pad; (void)rgb; }
+void smk_pad_dim(int lvl) { (void)lvl; }
+void smk_pads_flush(void) { }
+void smk_pad_mode(int drums) { tw_padmode = drums; }
+static uint16_t pad_down;
+int smk_pad_held(int pad) { return pad >= 0 && pad < 16 && ((pad_down >> pad) & 1u); }
+/* a pad hit as the panel gives it: a white key (its velocity), or with DRUM PADS the queue */
+void tw_pad(int pad, int vel)
+{
+    static const uint8_t WN[16] = { 0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24, 26 };
+    if (vel) pad_down |= (uint16_t)(1u << pad); else pad_down &= (uint16_t)~(1u << pad);
+    if (tw_padmode) { tw_ext(0x40 + pad, vel); return; }
+    if (vel) { tw_vel[WN[pad]] = vel; tw_keys |= 1u << WN[pad]; } else tw_keys &= ~(1u << WN[pad]);
+}
+int smk_trim_read(void) { return 0; }
+void smk_stats(uint32_t *f, uint32_t *ok, uint32_t *miss) { *f = 0; *ok = 0; *miss = 0; }
+int smk_enc_take(int k) { (void)k; return 0; }
+void trs_midi_send(const uint8_t *b, int n) { for (int i = 0; i < n; i++) if (tw_trs_n < sizeof tw_trs) tw_trs[tw_trs_n++] = b[i]; }
+void trs_midi_pump(void) { }
+#endif

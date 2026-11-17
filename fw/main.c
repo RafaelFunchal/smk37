@@ -81,7 +81,7 @@
 #include "../hal/smk37/smk_ctl.h"
 #include "../hal/smk37/smk_panel.h"
 #include "../engine/piano.h"
-#define SMK_LOWBSS __attribute__((section(".lowbss.smk")))   /* (the SMK-37: written before read, to make room) */
+#define SMK_LOWBSS GB_LOWRAM                /* (the SMK-37: written before read, in the low RAM, to make room) */
 #define PANEL_KEYS 37                           /* the SMK-37's keys: the FM-1's 27, then the outer ten (fw/smk.inc) */
 #define SL_READ smk_no_read                 /* SLOOP 2.8's data is the FM-1's: none here (its places hold the piano) */
 static int smk_no_read(uint32_t a, void *d, uint32_t n) { (void)a; (void)d; (void)n; return -1; }

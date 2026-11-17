@@ -11,6 +11,7 @@
 #include "../fw/main.c"
 #include <pthread.h>
 #include <stdio.h>
+#include <unistd.h>                        /* (_exit: gcc 14 refuses it undeclared) */
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -89,6 +90,12 @@ static int tw_sloop_writes;
 void twin_flash_op(int kind, uint32_t a, uint32_t n)
 {
     (void)n; if (kind == 1) tw_erases++; else tw_writes++;
+#if BOARD_SMK37
+    /* the SMK-37: its data above the calibration only (host/hal.c refuses the rest), and the slot only from the editor */
+    if (a >= SMK_SLOT_AT && a < SMK_DATA_AT && !(ed_sm.on || ed_sm.phase) && tw_sloop_writes++ < 5)
+        printf("[%8.3f] !! TWIN: SMK-37: the sample slot written, no sample being sent (flash 0x%05X)\n", tw_s(), a);
+    if (BOARD_SMK37) return;
+#endif
     /* SLOOP 2.8's data (0x97000..) is never written: but its staging area (erasable), and a user slot the editor sends */
     if (a >= 0x97000u && !(a >= 0xE0000u && a < 0xE5000u)) {
         static const uint32_t AT[4] = { 0xA0000u, 0xB4000u, 0xC8000u, 0xE7000u };
@@ -2093,10 +2100,130 @@ static void sc_sounds(void)
     tap(B_HOME); wait_ms(300);
     save_and_wait();
 }
+#if BOARD_SMK37
+/* ---- the SMK-37 (fw/smk.inc): its keys, pads, faders, wheels, pedal, TRS jack; the PIANO engine */
+void tw_ext(int key, int vel); void tw_pedal(int down); void tw_pad(int pad, int vel);
+extern int tw_vel[27], tw_fader[4], tw_padmode, tw_smk_bad_writes; extern float tw_bend, tw_mod; extern uint32_t tw_xbtn, tw_tint;
+extern uint8_t tw_trs[4096]; extern uint32_t tw_trs_n;
+static int sounding(int t, int note)            /* a voice of track t on that note, not released */
+{
+    for (int i = 0; i < GB_NVOICE; i++) if (S.v[i].state == V_ON && S.v[i].track == t && S.v[i].note == note) return 1;
+    return 0;
+}
+static int synth_trk(void) { for (int t = 0; t < NTRK; t++) if (!is_drum(t)) return t; return 0; }
+static int drum_trk(void) { for (int t = 0; t < NTRK; t++) if (is_drum(t)) return t; return -1; }
+static void xtap(int sb) { tw_xbtn |= 1u << sb; wait_ms(60); tw_xbtn &= ~(1u << sb); wait_ms(150); }
+static void sc_smk(void)
+{
+    boot_wait();
+    for (int i = 0; i < 400 && splash_on; i++) wait_ms(10);
+    EXPECT(tw_audio_on, "SMK-37: no sound started");
+    EXPECT(piano_bank_ok(), "SMK-37: the piano bank at 0x78000 not taken");
+    EXPECT(GB_NVOICE == 24, "SMK-37: %d voices", GB_NVOICE);
+    int t = synth_trk(); select_track(t); trk = t; oct = 0; wait_ms(100);
+    /* the PIANO: a factory sound, heard, louder with the velocity */
+    int np = preset_named("CONCERT"); EXPECT(np >= 0 && gb_presets[np].engine == ENG_PIANO, "no CONCERT piano preset");
+    apply_preset(t, np); wait_ms(200);
+    EXPECT(S.trk[t].patch.engine == ENG_PIANO, "CONCERT: not the PIANO engine");
+    {   /* (how loud, next to the SAMPLE engine's GRAND PNO, the factory sounds' common level) */
+        int gp = preset_named("GRAND PNO"); apply_preset(t, gp); wait_ms(200);
+        tw_vel[7] = 127; keydown(7); double g = peak_over(400); keyup(7); wait_ms(1500);
+        apply_preset(t, np); wait_ms(200);
+        tw_vel[7] = 127; keydown(7); double p = peak_over(400); keyup(7); wait_ms(1500);
+        printf("[%8.3f]    C4 at 127: GRAND PNO (SAMPLE) peak %.4f, CONCERT (PIANO) peak %.4f\n", tw_s(), g, p);
+    }
+    tw_vel[7] = 25; keydown(7); double soft = peak_over(400); keyup(7); wait_ms(1500);
+    tw_vel[7] = 127; keydown(7); double hard = peak_over(400); keyup(7); wait_ms(1500);
+    printf("[%8.3f]    PIANO C4: velocity 25 peak %.4f, 127 peak %.4f\n", tw_s(), soft, hard);
+    EXPECT(soft > 0.0002 && hard > soft * 1.5, "the piano: velocity 25 %.4f, 127 %.4f", soft, hard);
+    wav_on("smk-piano");
+    static const int CH[3][3] = { { 7, 11, 14 }, { 5, 9, 12 }, { 2, 7, 11 } };
+    for (int c = 0; c < 3; c++) { for (int i = 0; i < 3; i++) { tw_vel[CH[c][i]] = 70 + 20 * i; keydown(CH[c][i]); } wait_ms(900); for (int i = 0; i < 3; i++) keyup(CH[c][i]); wait_ms(200); }
+    wait_ms(1500); tw_wav_close();
+    shot("smk-piano");
+    /* the outer keys: C3 (keybed 0) and C6 (keybed 36) play notes 48 and 84 on the synth track */
+    tw_ext(0, 100); wait_ms(60);
+    EXPECT(sounding(t, 48), "outer key C3: no note 48");
+    tw_ext(36, 100); wait_ms(60);
+    EXPECT(sounding(t, 84), "outer key C6: no note 84");
+    tw_ext(0, 0); tw_ext(36, 0); wait_ms(80);
+    EXPECT(!sounding(t, 48) && !sounding(t, 84), "outer keys let go: still on");
+    /* the pedal: a key let go keeps sounding while it is down, ends when it comes up */
+    tw_pedal(1); wait_ms(60);
+    keydown(7); wait_ms(60); keyup(7); wait_ms(120);
+    EXPECT(sounding(t, 60), "pedal down: C4 let go, not held");
+    tw_pedal(0); wait_ms(120);
+    EXPECT(!sounding(t, 60), "pedal up: C4 still on");
+    /* the TRS jack: the key's note went out (note on, channel of the track) */
+    int on = 0; for (uint32_t i = 0; i + 2 < tw_trs_n; i++) if ((tw_trs[i] & 0xF0) == 0x90 && tw_trs[i + 1] == 60 && tw_trs[i + 2]) on = 1;
+    EXPECT(on, "TRS MIDI OUT: no note-on for C4 (%u bytes)", tw_trs_n);
+    /* the wheels: bend on the selected track, the vibrato moves it */
+    tw_bend = 1.0f; wait_ms(50);
+    EXPECT(fabsf(S.trk[t].bend - (float)m_bend) < 0.01f, "the pitch wheel: bend %.3f (want %d)", S.trk[t].bend, m_bend);
+    tw_bend = 0.0f; tw_mod = 1.0f; float lo = 9, hi = -9;
+    for (int i = 0; i < 40; i++) { wait_ms(5); if (S.trk[t].bend < lo) lo = S.trk[t].bend; if (S.trk[t].bend > hi) hi = S.trk[t].bend; }
+    EXPECT(hi - lo > 0.3f && hi < 0.6f, "the mod wheel's vibrato: bend %.3f .. %.3f", lo, hi);
+    tw_mod = 0.0f; wait_ms(50);
+    EXPECT(fabsf(S.trk[t].bend) < 0.01f, "the wheels at rest: bend %.3f", S.trk[t].bend);
+    /* the faders: bank A, level; a fader takes over only once it reaches the value */
+    int t1 = smk_trk_shown(0); float before = S.trk[t1].level.tgt;
+    int far = before < 0.5f ? 127 : 0;
+    tw_fader[0] = far; wait_ms(100);
+    EXPECT(fabsf(S.trk[t1].level.tgt - before) < 0.001f, "fader 1: jumped before reaching the level (%.3f -> %.3f)", before, S.trk[t1].level.tgt);
+    for (int v = far; far ? v >= 0 : v <= 127; v += far ? -8 : 8) { tw_fader[0] = v; wait_ms(30); }
+    tw_fader[0] = 64; wait_ms(100);
+    EXPECT(fabsf(S.trk[t1].level.tgt - 64.0f / 127.0f) < 0.01f, "fader 1: not taken over (level %.3f)", S.trk[t1].level.tgt);
+    uint32_t m = msg_mark(); xtap(SB_FADER_BANK);
+    EXPECT(smk_fbank == 1 && said_since(m, "FADERS: B"), "FADER BANK: not bank B (%d)", smk_fbank);
+    for (int i = 0; i < 4; i++) xtap(SB_FADER_BANK);
+    EXPECT(smk_fbank == 0, "FADER BANK: five banks, round (%d)", smk_fbank);
+    /* KNOB BANK: DRUM PADS, the drums from the pads while the keys play the synth */
+    int dt = drum_trk(); EXPECT(dt >= 0, "no drum track");
+    xtap(SB_KNOB_BANK); wait_ms(100);
+    EXPECT(smk_drumpads && tw_padmode, "KNOB BANK: no DRUM PADS");
+    tw_pad(0, 110); wait_ms(60);
+    int drum_on = 0; for (int i = 0; i < GB_NVOICE; i++) if (S.v[i].state != V_FREE && S.v[i].track == dt) drum_on = 1;
+    tw_pad(0, 0); wait_ms(60);
+    EXPECT(drum_on && trk == t, "DRUM PADS: pad 1 did not play the drums (or the track changed)");
+    xtap(SB_KNOB_BANK); wait_ms(100);
+    EXPECT(!smk_drumpads && !tw_padmode, "KNOB BANK again: DRUM PADS still on");
+    /* a pad as a white key: pad 1 = F3 (note 53 with no scale) */
+    tw_pad(0, 90); wait_ms(60);
+    EXPECT(sounding(t, 53), "pad 1: no F3");
+    tw_pad(0, 0); wait_ms(60);
+    /* the drum track: the outer keys are KICK and RIDE */
+    select_track(dt); trk = dt; wait_ms(80);
+    tw_ext(0, 100); wait_ms(40);
+    int kick = 0; for (int i = 0; i < GB_NVOICE; i++) if (S.v[i].state != V_FREE && S.v[i].track == dt && S.v[i].note == 0) kick = 1;
+    tw_ext(0, 0); wait_ms(40);
+    EXPECT(kick, "drum track: C3 is not the kick");
+    /* < >: the tracks */
+    int p0 = POS[trk]; xtap(SB_RIGHT); EXPECT(POS[trk] == (p0 + 1) % NTRK, "> : not the next track"); xtap(SB_LEFT); EXPECT(POS[trk] == p0, "< : not back");
+    /* the project saved: only the SMK-37's data range written */
+    select_track(t); trk = t;
+    save_and_wait();
+    EXPECT(tw_smk_bad_writes == 0, "%d writes outside the SMK-37's range", tw_smk_bad_writes);
+    EXPECT(!memcmp(tw_flash + SMK_TRIM_AT + 0x224, "trimdat", 8), "the calibration's marker changed");
+}
+static void sc_smk_reboot(void)                  /* after sc_smk's flash: the project comes back, the piano too */
+{
+    boot_wait();
+    digest("boot-state.txt");
+    EXPECT(proj_used != 0, "SMK-37: no project after the restart");
+    EXPECT(piano_bank_ok(), "SMK-37: the piano lost");
+    int t = synth_trk();
+    EXPECT(S.trk[t].patch.engine == ENG_PIANO, "SMK-37: the track's piano not kept (engine %d)", S.trk[t].patch.engine);
+    check_project_roundtrip("SMK-37 after the restart");
+}
+#endif
 static const struct { const char *name; void (*fn)(void); } SC[] = {
     { "boot", sc_boot }, { "reboot", sc_reboot }, { "sounds", sc_sounds }, { "ukit", sc_ukit }, { "pages", sc_pages }, { "record", sc_record },
     { "powercut", sc_powercut }, { "aftercut", sc_after_cut }, { "sample", sc_sample }, { "editor", sc_editor },
-    { "monkey", sc_monkey }, { "import", sc_import }, { "midi", sc_midi }, { "rescue", sc_rescue }, { "calib", sc_calib }, { "settings", sc_settings }, { "play", sc_play }, { "levels", sc_levels }, { "mixui", sc_mixui }, { "fx", sc_fx }, { "editor2", sc_editor2 }, { "serve", sc_serve }, { "vis", sc_vis }, { "banksave", sc_banksave }, { "punch", sc_punch }, { "film", sc_film }, { "inst", sc_inst }, { "film2", sc_film2 }, { "bigproj", sc_bigproj }, { "bigcut", sc_bigcut }, { "punch2", sc_punch2 }, { "crumb", sc_crumb }, { "nan", sc_nan } };
+    { "monkey", sc_monkey }, { "import", sc_import }, { "midi", sc_midi }, { "rescue", sc_rescue }, { "calib", sc_calib }, { "settings", sc_settings }, { "play", sc_play }, { "levels", sc_levels }, { "mixui", sc_mixui }, { "fx", sc_fx }, { "editor2", sc_editor2 }, { "serve", sc_serve }, { "vis", sc_vis }, { "banksave", sc_banksave }, { "punch", sc_punch }, { "film", sc_film }, { "inst", sc_inst }, { "film2", sc_film2 }, { "bigproj", sc_bigproj }, { "bigcut", sc_bigcut }, { "punch2", sc_punch2 }, { "crumb", sc_crumb }, { "nan", sc_nan }
+#if BOARD_SMK37
+    , { "smk", sc_smk }, { "smk-reboot", sc_smk_reboot }
+#endif
+};
 static void (*tw_sc)(void);
 static void *tw_script(void *arg)
 {
@@ -2138,9 +2265,17 @@ int main(int argc, char **argv)
     FILE *f = argc > 3 && strcmp(argv[3], "-") ? fopen(argv[3], "rb") : 0;
     if (f) { size_t n = fread(tw_flash, 1, TW_FLASH, f); fclose(f); (void)n; }
     else {                                             /* blank: m-bootloader's place, the firmware's area installed */
+#if BOARD_SMK37                                        /* (the SMK-37's install: its area, then the piano bank in clear) */
+        FILE *a = fopen("build/fw-smk37/fw.area", "rb"), *pf = fopen("build/fw-smk37/piano.img", "rb");
+        if (!a || !pf) { fprintf(stderr, "build/fw-smk37: BOARD=smk37 fw/build.sh first\n"); return 2; }
+        size_t n = fread(tw_flash + 0x4000, 1, SMK_PIANO_AT - 0x4000, a); fclose(a); (void)n;
+        n = fread(tw_flash + SMK_PIANO_AT, 1, SMK_PIANO_END - SMK_PIANO_AT, pf); fclose(pf); (void)n;
+        memcpy(tw_flash + SMK_TRIM_AT + 0x224, "trimdat", 8);   /* (the unit's calibration record: never written) */
+#else
         FILE *a = fopen("build/fw/fw.area", "rb");
         if (!a) { fprintf(stderr, "build/fw/fw.area: build the firmware first\n"); return 2; }
         size_t n = fread(tw_flash + 0x4000, 1, TW_FLASH - 0x4000, a); fclose(a); (void)n;
+#endif
         memset(tw_flash, 0x00, 0x4000);
     }
     tw_flash_init();

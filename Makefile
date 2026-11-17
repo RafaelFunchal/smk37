@@ -48,6 +48,12 @@ build/fuzz: $(FUZZSRC)
 	mkdir -p build && gcc -O1 -g -std=c11 -Wall -Wextra -Wno-unused-parameter -ffp-contract=off -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -o $@ $(FUZZSRC) -lm
 # the PC twin: fw/main.c itself on a simulated FM-1 (host/), its scenarios (host/twin.sh), under the sanitizers
 TWINSRC = host/twin.c host/hal.c app/project.c app/psound.c app/presets.c app/preset_data.c app/sloopimport.c app/sloop_kinds.c app/usersnd.c app/xbank.c app/edproto.c app/store.c app/ui.c app/gfx.c app/vis.c app/fonts.c app/harmony.c app/midi.c app/arp.c app/engdesc.c app/demo_song.c seq/seq.c $(ENGINE)
+# the SMK-37's twin: fw/main.c with BOARD_SMK37 (fw/smk.inc, the piano) on the twin's SMK-37 (host/hal.c), its
+# scenarios (host/twin.c sc_smk*); after BOARD=smk37 fw/build.sh
+twin-smk: build/twin-smk
+	sh host/twin-smk.sh
+build/twin-smk: $(TWINSRC) engine/piano.c fw/main.c fw/smk.inc host/twin.h
+	mkdir -p build && gcc -DHOST -DBOARD_SMK37=1 -O1 -g -std=gnu11 -w -ffp-contract=off -fsanitize=address,undefined -fno-omit-frame-pointer -pthread -o $@ $(TWINSRC) engine/piano.c -lm
 twin: build/twin build/fw/fw.area
 	sh host/twin.sh 60 "1 2"
 build/twin: $(TWINSRC) fw/main.c host/twin.h
