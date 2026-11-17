@@ -27,6 +27,10 @@ static const char *const L20[2] = { "OFF", "ON" };
 static const char *const L21[5] = { "BREAK", "USR1", "USR2", "USR3", "USR4" };
 static const char *const L22[5] = { "4", "8", "16", "32", "AUTO" };
 static const char *const L23[3] = { "ONE", "GATE", "LOOP" };
+#if BOARD_SMK37
+static const char *const LP0[4] = { "CONCERT", "STUDIO", "VINTAGE", "JAZZ" };
+static const char *const LP1[4] = { "SOFT", "NORMAL", "HARD", "FIXED" };
+#endif
 const edesc gb_edesc[ENG_N] = {
     [ENG_VA] = { "ANALOG", { "OSC", "FLT" }, { { "WAVE", PF_LIST, 5, L0 }, { "DTN", PF_CENT, 0, 0 }, { "MIX", PF_PCT, 0, 0 }, { "NOIS", PF_PCT, 0, 0 }, { "CUT", PF_CUT, 0, 0 }, { "RES", PF_PCT, 0, 0 }, { "DRV", PF_PCT, 0, 0 }, { "KTR", PF_PCT, 0, 0 } }, 4, 5 },
     [ENG_DRUM] = { "DRUMS", { "KIT", "SOUNDS" }, { { "KIT", PF_LIST, 46, L1 }, { "TUNE", PF_SEMI, 0, 0 }, { "DEC", PF_NUM, 0, 0 }, { "DRIVE", PF_PCT, 0, 0 }, { "", PF_NUM, 0, 0 }, { "", PF_NUM, 0, 0 }, { "", PF_NUM, 0, 0 }, { "", PF_NUM, 0, 0 } }, -1, -1 },
@@ -42,4 +46,7 @@ const edesc gb_edesc[ENG_N] = {
     [ENG_SAMPLE] = { "SAMPLE", { "SET", "TONE" }, { { "SET", PF_LIST, 12, L19 }, { "TUNE", PF_SEMI, 0, 0 }, { "BITS", PF_NUM, 0, 0 }, { "LOOP", PF_LIST, 2, L20 }, { "CUT", PF_NUM, 0, 0 }, { "", PF_NUM, 0, 0 }, { "DRV", PF_PCT, 0, 0 }, { "", PF_NUM, 0, 0 } }, 4, -1 },
     [ENG_GRAIN] = { "GRAIN", { "GRAN", "SPRY" }, { { "SRC", PF_LIST, 12, L19 }, { "POS", PF_PCT, 0, 0 }, { "SIZE", PF_PCT, 0, 0 }, { "DENS", PF_PCT, 0, 0 }, { "PTCH", PF_SEMI, 0, 0 }, { "SPRD", PF_PCT, 0, 0 }, { "RAND", PF_PCT, 0, 0 }, { "TONE", PF_PCT, 0, 0 } }, 7, -1 },
     [ENG_SLICE] = { "SLICE", { "CUT", "PLAY" }, { { "SRC", PF_LIST, 5, L21 }, { "DIV", PF_LIST, 5, L22 }, { "STRT", PF_NUM, 0, 0 }, { "PTCH", PF_SEMI, 0, 0 }, { "MODE", PF_LIST, 3, L23 }, { "REV", PF_LIST, 2, L20 }, { "DCAY", PF_NUM, 0, 0 }, { "TONE", PF_NUM, 0, 0 } }, 7, -1 },
+#if BOARD_SMK37                     /* (by hand, not tools/mkengdesc.py: the SMK-37's piano, engine/piano.c) */
+    [ENG_PIANO] = { "PIANO", { "TONE", "DAMP" }, { { "TONE", PF_LIST, 4, LP0 }, { "BRILL", PF_PCT, 0, 0 }, { "TOUCH", PF_LIST, 4, LP1 }, { "DECAY", PF_NUM, 0, 0 }, { "DAMPR", PF_NUM, 0, 0 }, { "NOISE", PF_PCT, 0, 0 }, { "WIDTH", PF_PCT, 0, 0 }, { "UNA C", PF_PCT, 0, 0 } }, 1, -1 },
+#endif
 };
