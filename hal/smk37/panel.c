@@ -55,7 +55,7 @@ static smk_pad_t pads[16] BOOTBSS; static smk_fad_t fads[4] BOOTBSS;
 static volatile uint16_t wheel_raw[2], pedal_raw, batt_raw; static volatile uint32_t pedal_n;
 static uint32_t adc_ok, adc_miss;
 static volatile uint8_t vel_mode;
-static uint16_t extq[32]; static volatile uint8_t extq_w, extq_r;
+static volatile uint16_t extq[32]; static volatile uint8_t extq_w, extq_r;
 /* the lights: buttons and white keys, a level each 0..4 (4 full); `full` from panel_led, `soft` from glow / level */
 static uint8_t led_full[14 + 27], led_soft[14 + 27], xled[SMK_NLED];
 static volatile uint32_t ledw[2] = { 0xFFFFFFFFu, 0xFFFFFFFFu };
@@ -196,9 +196,9 @@ static void enc_frame(void)                         /* the stock decoder: 4 coun
         if (enc_cnt[e] >= 4 || enc_cnt[e] <= -4) { int s = enc_cnt[e] / 4; enc_steps[e] = (int16_t)(enc_steps[e] + s); enc_cnt[e] = (int16_t)(enc_cnt[e] - s * 4); }
     }
 }
-static int lit(uint32_t lvl, uint32_t f)            /* a level 0..4 on frame f: 4 always, 3 three in 4, 2 one in 2, 1 one in 8 */
+static int lit(uint32_t lvl, uint32_t f)            /* a level 0..4 on frame f: 4 always, 3 three in 4, 2 one in 2, 1 one in 4 */
 {
-    return lvl >= 4u || (lvl == 3u && (f & 3u)) || (lvl == 2u && !(f & 1u)) || (lvl == 1u && !(f & 7u));
+    return lvl >= 4u || (lvl == 3u && (f & 3u)) || (lvl == 2u && !(f & 1u)) || (lvl == 1u && !(f & 3u));
 }
 static void leds_frame(void)
 {
@@ -364,6 +364,7 @@ XT void smk_xled(int sb, int on) { if (sb >= 0 && sb < SMK_NLED) xled[sb] = (uin
 
 /* ---- the pads' colours: a frame of 36 latch bytes and 16 x 24 bit bytes, sent by board.c */
 static uint32_t tint = 0xFFA040u, own[16], dimlvl;
+static uint32_t sent_grb[16], sent_ok;                 /* the frame last sent: sent again only when it differs */
 static uint8_t frame_buf[SMK_PADLED_LATCH + 16 * 24] __attribute__((aligned(4))) BOOTBSS;
 int lcd_pads_send(const uint8_t *frame, uint32_t n);                 /* board.c: 0 sent, -1 the bus busy */
 XT void smk_pad_tint(uint32_t rgb) { if (rgb != tint) { tint = rgb; pads_dirty = 1; } }
@@ -373,7 +374,7 @@ XT void smk_pads_flush(void)
 {
     static const uint8_t SCALE[5] = { 0, 14, 48, 128, 255 };        /* a level's share of the full colour (/255) */
     if (!pads_dirty) return;
-    for (uint32_t i = 0; i < SMK_PADLED_LATCH; i++) frame_buf[i] = 0;   /* (.bootbss: the latch's zeros, every frame) */
+    uint32_t want[16];
     for (int p = 0; p < 16; p++) {
         int id = 14 + WHITE_NOTE[p];
         uint32_t lvl = led_full[id] ? 4u : led_soft[id], c = own[p] ? own[p] : tint, g = 0;
@@ -383,11 +384,19 @@ XT void smk_pads_flush(void)
             if (lvl && ((c >> k) & 255u) > 48u && !v) v = 1;                /* a lit pad stays visible */
             g |= v << k;
         }
-        uint32_t grb = ((g >> 8) & 255u) << 16 | ((g >> 16) & 255u) << 8 | (g & 255u);
-        uint8_t *o = frame_buf + SMK_PADLED_LATCH + SMK_PAD_SLOT[p] * 24;
-        for (int i = 0; i < 24; i++) o[i] = (grb >> (23 - i)) & 1u ? 0xF0u : 0xC0u;
+        want[p] = ((g >> 8) & 255u) << 16 | ((g >> 16) & 255u) << 8 | (g & 255u);
     }
-    if (lcd_pads_send(frame_buf, sizeof frame_buf) == 0) pads_dirty = 0;
+    pads_dirty = 0;
+    int same = sent_ok;
+    for (int p = 0; same && p < 16; p++) same = want[p] == sent_grb[p];
+    if (same) return;                                       /* (leds() lights the same pads again every round: no resend) */
+    for (uint32_t i = 0; i < SMK_PADLED_LATCH; i++) frame_buf[i] = 0;   /* (.lowbss: the latch's zeros, every frame) */
+    for (int p = 0; p < 16; p++) {
+        uint8_t *o = frame_buf + SMK_PADLED_LATCH + SMK_PAD_SLOT[p] * 24;
+        for (int i = 0; i < 24; i++) o[i] = (want[p] >> (23 - i)) & 1u ? 0xF0u : 0xC0u;
+    }
+    if (lcd_pads_send(frame_buf, sizeof frame_buf) == 0) { for (int p = 0; p < 16; p++) sent_grb[p] = want[p]; sent_ok = 1; }
+    else pads_dirty = 1;                                    /* (the bus busy: the next round) */
 }
 
 /* ---- the extras */
@@ -403,7 +412,9 @@ int smk_ext_take(void)
 }
 XT int smk_fader(int i) { return i >= 0 && i < 4 ? fads[i].v : -1; }
 static smk_pw_t pw; static smk_mw_t mw;
-float smk_bend(void) { uint32_t r = wheel_raw[0]; return r ? smk_pw_bend(&pw, (int32_t)r, time_ticks() / (1000u * time_mhz())) : 0.0f; }
+static uint32_t ms_now(void) { return irq_ticks() / (SMK_TICK_HZ / 1000u); }   /* (the 10 kHz tick: wraps after ~5 days; time_ticks
+                                                                                    * / LSB wrapped every 71.6 s) */
+float smk_bend(void) { uint32_t r = wheel_raw[0]; return r ? smk_pw_bend(&pw, (int32_t)r, ms_now()) : 0.0f; }
 float smk_mod(void) { uint32_t r = wheel_raw[1]; return r ? smk_mw_val(&mw, (int32_t)r) : 0.0f; }
 XT int smk_pedal_take(void)
 {
@@ -411,7 +422,7 @@ XT int smk_pedal_take(void)
     uint32_t n = pedal_n;
     if (n == seen) return -1;
     seen = n;
-    return smk_ped_sample(&ped, pedal_raw, time_ticks() / (1000u * time_mhz()));
+    return smk_ped_sample(&ped, pedal_raw, ms_now());
 }
 int smk_batt_raw(void) { return batt_raw; }
 XT void smk_stats(uint32_t *f, uint32_t *ok, uint32_t *miss) { *f = frames; *ok = adc_ok; *miss = adc_miss; }

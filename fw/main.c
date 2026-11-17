@@ -4350,6 +4350,9 @@ int app_main(uint32_t arg)
             int pl = audio_playing_half();
             for (uint32_t b = 0; b < HALF_FRAMES / GB_BLOCK; b++) {
                 if (b) midi_poll();                          /* (the wires read between the blocks too) */
+#if BOARD_SMK37
+                trs_midi_pump();                             /* (and the TRS jack's next byte sent) */
+#endif
                 blk_t = t0 + b * blk_ticks;
 #if BOARD_SMK37
                 smk_block();                                 /* the wheels: bend and vibrato */

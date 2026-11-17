@@ -114,6 +114,10 @@ int lcd_pads_send(const uint8_t *frame, uint32_t n)
     SPI1_BAUD = SMK_PADLED_BAUD;
     IOMAP_CON1 |= SMK_SPI1_GROUP_B;
     SPI1_CON &= ~(1u << 12);
+    /* the latch: the frame's first SMK_PADLED_LATCH bytes are zeros; sent 6 more times first, ~300 us low in all (SLOOP
+     * Pro: the stock 36 bytes, 43 us, are too short for newer WS2812 parts: the pin switch's glitch then counts as a
+     * bit and shifts the chain, a lit pad turning its neighbour green) */
+    for (int i = 0; i < 6; i++) { SPI1_CON |= 1u << 14; SPI1_ADR = (uint32_t)(uintptr_t)frame; SPI1_CNT = SMK_PADLED_LATCH; spi_wait(); }
     SPI1_CON |= 1u << 14;
     SPI1_ADR = (uint32_t)(uintptr_t)frame; SPI1_CNT = n;
     spi_wait();

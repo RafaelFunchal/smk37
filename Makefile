@@ -3,7 +3,7 @@ CC ?= cc
 CFLAGS ?= -O2 -std=c11 -Wall -Wextra -Wno-unused-parameter -ffp-contract=off
 ENGINE = engine/sound.c engine/fx.c engine/master.c engine/common.c engine/va.c engine/drum.c engine/drumkits.c engine/fm.c engine/lofi.c engine/pd.c engine/wheel.c engine/noise.c engine/voice.c engine/trio.c engine/phys.c engine/fm6.c engine/fm6_patches.c engine/sample.c engine/grain.c engine/slice.c engine/slice_scan.c engine/trackfx.c engine/texture.c engine/engines.c
 .PHONY: test demo clean levels fuzz twin denorm fonts
-test: build/sound_test build/seq_test build/store_test build/harmony_test build/arp_test build/level_tool build/sloop_test build/midi_test build/ui_shots
+test: build/smk_ctl_test build/sound_test build/seq_test build/store_test build/harmony_test build/arp_test build/level_tool build/sloop_test build/midi_test build/ui_shots
 	./build/sound_test
 	./build/seq_test
 	./build/store_test
@@ -13,6 +13,9 @@ test: build/sound_test build/seq_test build/store_test build/harmony_test build/
 	./build/sloop_test
 	./build/midi_test
 	mkdir -p build/shots && ./build/ui_shots
+	./build/smk_ctl_test
+build/smk_ctl_test: tests/smk_ctl_test.c hal/smk37/smk_ctl.h
+	mkdir -p build && $(CC) $(CFLAGS) -o $@ tests/smk_ctl_test.c
 build/harmony_test: tests/harmony_test.c app/harmony.c app/harmony.h
 	mkdir -p build && $(CC) $(CFLAGS) -o $@ tests/harmony_test.c app/harmony.c
 build/level_tool: tests/level_tool.c app/presets.c app/preset_data.c app/presets.h $(ENGINE)

@@ -6,6 +6,7 @@ TC=${1:-${PI32V2_LLVM:-toolchain/bin}}
 # BOARD=smk37: the M-VAVE SMK-37 (hal/smk37: its screen, panel, pads, faders, wheels, TRS MIDI OUT; the piano bank),
 # into build/fw-smk37; without it, the FM-1 as always, into build/fw
 BOARD=${BOARD:-fm1}
+[ "$BOARD" = smk37 ] && [ -n "${BOOT_DIAG:-}" ] && { echo "BOOT_DIAG drives PA2 (fw/xip.S), a key-matrix row on the SMK-37: not for it"; exit 1; }
 case $BOARD in fm1) O=build/fw; BF="";; smk37) O=build/fw-smk37; BF="-DBOARD_SMK37=1";; *) echo "BOARD: fm1 or smk37"; exit 1;; esac
 H=hal/fm1; HB=hal/fm1; [ $BOARD = smk37 ] && HB=hal/smk37
 rm -rf $O; mkdir -p $O/o

@@ -112,9 +112,13 @@ static inline void smk_fad_init(smk_fad_t *f) { f->h0 = f->h1 = 0; f->acc = 0; f
 static inline void smk_fad_run(smk_fad_t *f, uint32_t raw)
 {
     uint32_t h0 = f->h0, h1 = f->h1, m;
+    if (f->v < 0) {                                         /* the first reading: there at once (a median with zeros halved it) */
+        f->h0 = f->h1 = (uint16_t)raw; f->acc = (int32_t)raw * 16;
+        f->v = (int16_t)(raw / 8u > 127u ? 127u : raw / 8u);
+        return;
+    }
     f->h1 = (uint16_t)h0; f->h0 = (uint16_t)raw;
     m = raw > h0 ? (h0 > h1 ? h0 : raw > h1 ? h1 : raw) : (raw > h1 ? raw : h0 > h1 ? h1 : h0);
-    if (f->v < 0) { f->acc = (int32_t)raw * 16; }                                 /* the first reading: there at once */
     f->acc += ((int32_t)m * 16 - f->acc) / 2;
     int32_t v = f->acc / 16 / 8; v = v < 0 ? 0 : v > 127 ? 127 : v;
     if (f->v < 0 || v > f->v + 1 || v + 1 < f->v || (v != f->v && (v == 0 || v == 127))) f->v = (int16_t)v;

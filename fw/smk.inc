@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * fw/main.c's SMK-37 part (included there with BOARD_SMK37): what the SMK-37 has beyond the FM-1, played the SLOOP way.
  * The panel reads as an FM-1 (hal/smk37/panel.c: the same buttons, keys and knobs); here the rest:
- *   - KEYS: velocity from the unit's factory curves (KEY VELOCITY in GLO > SMK); the ten outer keys (C3..E3 below,
+ *   - KEYS: velocity from the unit's factory curves (the dynamic curve; no setting yet); the ten outer keys (C3..E3 below,
  *     G#5..C6 above) play on as keys 27..36 (their notes through the track's scale, chords and arpeggiator; on the drum
  *     track: KICK, SNARE, HAT below, BELL, OPEN, CRASH, RIDE above)
  *   - PADS: the FM-1's 16 white keys (steps, patterns, the mix, SOUNDS, notes, drums), lit in the track's colour;
@@ -31,8 +31,10 @@ COLD static void smk_pedal(void)
 {
     int p = smk_pedal_take();
     if (p < 0) return;
+    static int8_t ch = -1;                                    /* (the channel its CC 64 went to: its release goes there too) */
     smk_sus = (uint8_t)p;
-    if (!is_drum(trk)) midi_out((uint8_t)(0xB0 | midi_ch_of_track(trk)), 64, p ? 127 : 0, 3);
+    if (p && !is_drum(trk)) { ch = (int8_t)midi_ch_of_track(trk); midi_out((uint8_t)(0xB0 | ch), 64, 127, 3); }
+    else if (!p && ch >= 0) { midi_out((uint8_t)(0xB0 | ch), 64, 0, 3); ch = -1; }
     if (p) return;
     uint32_t held = panel_keys() | ek_held;
     for (int k = 0; k < PANEL_KEYS; k++)
@@ -82,6 +84,7 @@ COLD static void smk_outer(void)
 /* ---- the faders: five banks, soft takeover */
 static uint8_t smk_fbank;
 static int8_t smk_fpick[4] = { -1, -1, -1, -1 };              /* -1: waiting to reach the value; else its last */
+static int8_t smk_fside[4];                                  /* (waiting: the side of the value the fader is on) */
 COLD static int smk_trk_shown(int pos) { for (int t = 0; t < NTRK; t++) if (POS[t] == pos) return t; return 0; }
 COLD static gb_smooth *smk_fader_target(int f, int *t)
 {
@@ -103,10 +106,9 @@ COLD static void smk_faders(void)
         gb_smooth *s = smk_fader_target(f, &t);
         float x = smk_fval(f, v), cur = s->tgt;
         if (smk_fpick[f] < 0) {                                 /* takes over once it crosses the value */
-            static int8_t side[4];
             int sd = x < cur - 0.02f ? -1 : x > cur + 0.02f ? 1 : 0;
-            if (sd && (!side[f] || side[f] == sd)) { side[f] = (int8_t)sd; continue; }
-            side[f] = 0; smk_fpick[f] = (int8_t)v;
+            if (sd && (!smk_fside[f] || smk_fside[f] == sd)) { smk_fside[f] = (int8_t)sd; continue; }
+            smk_fside[f] = 0; smk_fpick[f] = (int8_t)v;
         }
         if (v == smk_fpick[f]) continue;
         smk_fpick[f] = (int8_t)v; sm_set(s, x); t_input = time_ticks();
@@ -120,7 +122,7 @@ COLD static void smk_fader_bank(int d)
 {
     static const char *const B[5] = { "FADERS: A · LEVEL 1-4", "FADERS: B · FILTER 1-4", "FADERS: C · REVERB 1-4", "FADERS: D · DELAY 1-4", "FADERS: E · DRUMS" };
     smk_fbank = (uint8_t)((smk_fbank + 5 + d) % 5);
-    for (int f = 0; f < 4; f++) smk_fpick[f] = -1;
+    for (int f = 0; f < 4; f++) { smk_fpick[f] = -1; smk_fside[f] = 0; }
     say(B[smk_fbank]);
 }
 /* ---- the wheels: bend and vibrato, once a block, on the selected synth track */
