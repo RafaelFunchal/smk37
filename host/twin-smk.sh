@@ -24,6 +24,7 @@ same smk smk-reboot
 run boot boot -
 run reboot reboot $O/boot/flash.bin
 same boot reboot
+run rescue rescue $O/boot/flash.bin                # (OCTAVE- held at power-on: RESCUE, the saved project kept)
 run pages pages -
 run record record -
 run sounds sounds -
