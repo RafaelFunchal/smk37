@@ -2119,6 +2119,25 @@ static int sounding(int t, int note)            /* a voice of track t on that no
 static int synth_trk(void) { for (int t = 0; t < NTRK; t++) if (!is_drum(t)) return t; return 0; }
 static int drum_trk(void) { for (int t = 0; t < NTRK; t++) if (is_drum(t)) return t; return -1; }
 static void xtap(int sb) { tw_xbtn |= 1u << sb; wait_ms(60); tw_xbtn &= ~(1u << sb); wait_ms(150); }
+/* the SMK-37's pads as lit: 8 x 2, their colours at their levels (NAME.ppm beside the screen's shots) */
+static void pads_shot(const char *name)
+{
+    extern uint32_t tw_padcol[16];
+    static const int SC[5] = { 0, 14, 48, 128, 255 };
+    char path[512]; snprintf(path, sizeof path, "%s/%s.ppm", tw_out, name);
+    FILE *f = fopen(path, "wb"); if (!f) return;
+    fprintf(f, "P6 %d %d 255\n", 8 * 56, 2 * 56);
+    for (int y = 0; y < 112; y++) for (int x = 0; x < 448; x++) {
+        int p = (y / 56) * 8 + x / 56, ix = x % 56, iy = y % 56; uint8_t px[3] = { 18, 18, 22 };
+        if (ix >= 4 && ix < 52 && iy >= 4 && iy < 52) {
+            int lv = tw_lvl[14 + white_key[p]]; uint32_t c = tw_padcol[p] ? tw_padcol[p] : tw_tint; int l = SC[lv > 4 ? 4 : lv];
+            px[0] = (uint8_t)(((c >> 16) & 255) * l / 255); px[1] = (uint8_t)(((c >> 8) & 255) * l / 255); px[2] = (uint8_t)((c & 255) * l / 255);
+            if (l < 30) { px[0] = (uint8_t)(px[0] + 24); px[1] = (uint8_t)(px[1] + 24); px[2] = (uint8_t)(px[2] + 26); }
+        }
+        fwrite(px, 1, 3, f);
+    }
+    fclose(f);
+}
 static void sc_smk(void)
 {
     boot_wait();
@@ -2204,6 +2223,7 @@ static void sc_smk(void)
 #define PADLVL(p) tw_lvl[14 + white_key[p]]
     smk_pads = PM_CONTROL; wait_ms(100);
     EXPECT(tw_padmode, "PADS CONTROL: the pads not taken as controls");
+    wait_ms(60); pads_shot("slots-1-empty-pads"); shot("slots-1-empty");
     EXPECT(smk_layer < 0 && smk_layer_park < 0 && PADLVL(13) == 1 && tw_padcol[13] == 0x808080u && PADLVL(14) == 1 && tw_padcol[14] == 0x808080u,
            "LAYER, SPLIT none chosen yet: not faint grey (layer %d %06x, split %d %06x)", PADLVL(13), tw_padcol[13], PADLVL(14), tw_padcol[14]);
     { m = msg_mark(); tw_pad(0, 90); wait_ms(60);
@@ -2258,26 +2278,17 @@ static void sc_smk(void)
       tw_pad(14, 90); wait_ms(60); tw_pad(14, 0); wait_ms(80);
       EXPECT(smk_split == S1 && smk_lower == D1 && PADLVL(14) == 4, "SPLIT a third time: not back as it was (%d %d), or its pad not lit", smk_split, smk_lower);
       EXPECT(PADLVL(0) == 4 && preset_of[t] == US_BASE + 0, "slot 1: its sound on the track, its pad not full (%d)", PADLVL(0));
-      {   /* the pads as lit: 8 x 2, their colours at their levels (build/.../smk-pads-lights.ppm) */
-          static const int SC[5] = { 0, 14, 48, 128, 255 };
-          char path[512]; snprintf(path, sizeof path, "%s/smk-pads-lights.ppm", tw_out);
-          FILE *f = fopen(path, "wb");
-          if (f) { fprintf(f, "P6 %d %d 255\n", 8 * 56, 2 * 56);
-              for (int y = 0; y < 112; y++) for (int x = 0; x < 448; x++) {
-                  int p = (y / 56) * 8 + x / 56, ix = x % 56, iy = y % 56; uint8_t px[3] = { 18, 18, 22 };
-                  if (ix >= 4 && ix < 52 && iy >= 4 && iy < 52) {
-                      uint32_t c = tw_padcol[p] ? tw_padcol[p] : tw_tint; int l = SC[PADLVL(p) > 4 ? 4 : PADLVL(p)];
-                      px[0] = (uint8_t)(((c >> 16) & 255) * l / 255); px[1] = (uint8_t)(((c >> 8) & 255) * l / 255); px[2] = (uint8_t)((c & 255) * l / 255);
-                      if (l < 30) { px[0] = (uint8_t)(px[0] + 24); px[1] = (uint8_t)(px[1] + 24); px[2] = (uint8_t)(px[2] + 26); }
-                  }
-                  fwrite(px, 1, 3, f); }
-              fclose(f); } }
+      pads_shot("smk-pads-lights");
       /* slot 2 held with the layer and the split on: all three sounds kept, and the setup; changed; tapped: all back.
        * Slot 1 (kept alone): the layer and the split off */
       {   /* (the split on a third track: the three sounds apart) */
         for (int i = 0; i < NTRK; i++) if (i != t && i != L1 && !is_drum(i)) D1 = i;
         smk_lower = (int8_t)D1; wait_ms(60);
-        m = msg_mark(); tw_pad(1, 90); wait_ms(2300); tw_pad(1, 0);
+        wait_ms(1600);                                            /* (the messages before: gone, for the pictures) */
+        m = msg_mark(); tw_pad(1, 90); wait_ms(1000);
+        double th = tw_s(); while (tw_lvl[14 + white_key[1]] != 4 && tw_s() - th < 0.4) wait_ms(5);   /* (the blink: lit) */
+        pads_shot("slots-2-holding-pads"); shot("slots-2-holding");
+        wait_ms(2300 - (int)((tw_s() - th) * 1000.0) - 1000); shot("slots-3-keeping"); pads_shot("slots-3-keeping-pads"); tw_pad(1, 0);
         EXPECT(wait_msg(m, "USER SOUNDS SAVED", 8000) && us_used(1) && us_used(10) && us_used(11),
                "slot 2 held with a layer and a split: not all kept (%d %d %d)", us_used(1), us_used(10), us_used(11));
         EXPECT(preset_of[L1] == US_BASE + 10 && preset_of[D1] == US_BASE + 11, "slot 2: the layer's and split's tracks not on their places");
@@ -2287,6 +2298,7 @@ static void sc_smk(void)
         tw_pad(14, 90); wait_ms(60); tw_pad(14, 0); wait_ms(60);          /* (the split off) */
         EXPECT(smk_layer == -1 && smk_split == -100, "before slot 2: the layer and the split not off");
         m = msg_mark(); tw_pad(1, 90); wait_ms(100); tw_pad(1, 0); wait_ms(250);
+        shot("slots-4-back"); pads_shot("slots-4-back-pads");
         EXPECT(smk_layer == L1 && smk_lower == D1 && smk_split == S1 && preset_of[trk] == US_BASE + 1 && preset_of[L1] == US_BASE + 10
                && preset_of[D1] == US_BASE + 11 && said_since(m, "+ LAYER + SPLIT"),
                "slot 2 tapped: not all back (layer %d/%d, split %d %d/%d %d, sounds %d %d %d)", smk_layer, L1, smk_lower, smk_split, D1, S1,
