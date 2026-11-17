@@ -147,6 +147,7 @@ keeps 2 of Erik37's 3 velocity layers and plays its lowest keys (A0..C#1) from t
 - **One sample slot (USR1)**; USR2-4 are refused by the editor. The flash holds the piano instead.
 - **SLOOP 2.8's data is not imported** (it is the FM-1's; SLOOP Pro's projects are another format).
 - **The line along the bottom of the screen is the battery.** Connected to a computer over USB (powered and charging), a cyan light runs along it **at the tempo**: a step each eighth note, one sweep a bar. While the sequencer plays (or counts in), each sweep starts on a bar's first beat; stopped, it follows the tempo you set. (The FM-1 runs it at a fixed speed.)
+- **The word BPM blinks at the tempo** (in the top bar): lit for each beat's first half, green on a bar's first beat while the sequencer plays or counts in. Stopped, it blinks at the tempo you set. With a three-digit tempo (or LARGE text) the word does not fit before the transport, so a dot blinks there instead.
 - No TRS MIDI IN (the SMK-37 has none), no Bluetooth (its radio needs M-VAVE's closed SDK).
 - RAM and flash are nearly full: 1 KB of RAM and ~15 KB of flash room left for the SMK-37's code.
 
