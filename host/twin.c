@@ -2272,6 +2272,32 @@ static void sc_smk(void)
                   }
                   fwrite(px, 1, 3, f); }
               fclose(f); } }
+      /* slot 2 held with the layer and the split on: all three sounds kept, and the setup; changed; tapped: all back.
+       * Slot 1 (kept alone): the layer and the split off */
+      {   /* (the split on a third track: the three sounds apart) */
+        for (int i = 0; i < NTRK; i++) if (i != t && i != L1 && !is_drum(i)) D1 = i;
+        smk_lower = (int8_t)D1; wait_ms(60);
+        m = msg_mark(); tw_pad(1, 90); wait_ms(2300); tw_pad(1, 0);
+        EXPECT(wait_msg(m, "USER SOUNDS SAVED", 8000) && us_used(1) && us_used(10) && us_used(11),
+               "slot 2 held with a layer and a split: not all kept (%d %d %d)", us_used(1), us_used(10), us_used(11));
+        EXPECT(preset_of[L1] == US_BASE + 10 && preset_of[D1] == US_BASE + 11, "slot 2: the layer's and split's tracks not on their places");
+        int other = -1; for (int i = 0; i < gb_npresets && other < 0; i++) if (gb_presets[i].kind == K_LEAD) other = i;
+        apply_preset(L1, other); wait_ms(60);
+        tw_pad(13, 90); wait_ms(60); tw_pad(13, 0); wait_ms(60);          /* (the layer off) */
+        tw_pad(14, 90); wait_ms(60); tw_pad(14, 0); wait_ms(60);          /* (the split off) */
+        EXPECT(smk_layer == -1 && smk_split == -100, "before slot 2: the layer and the split not off");
+        m = msg_mark(); tw_pad(1, 90); wait_ms(100); tw_pad(1, 0); wait_ms(250);
+        EXPECT(smk_layer == L1 && smk_lower == D1 && smk_split == S1 && preset_of[trk] == US_BASE + 1 && preset_of[L1] == US_BASE + 10
+               && preset_of[D1] == US_BASE + 11 && said_since(m, "+ LAYER + SPLIT"),
+               "slot 2 tapped: not all back (layer %d/%d, split %d %d/%d %d, sounds %d %d %d)", smk_layer, L1, smk_lower, smk_split, D1, S1,
+               preset_of[trk], preset_of[L1], preset_of[D1]);
+        tw_pad(0, 90); wait_ms(100); tw_pad(0, 0); wait_ms(250);
+        EXPECT(preset_of[trk] == US_BASE + 0 && smk_layer == -1 && smk_split == -100, "slot 1 (kept alone) tapped: the layer or the split still on (%d %d)", smk_layer, smk_split);
+        tw_pad(13, 90); wait_ms(60); tw_pad(13, 0); wait_ms(60);
+        EXPECT(smk_layer == L1, "after slot 1: LAYER does not bring the layer back (%d)", smk_layer);
+        m = msg_mark(); user_save(12, 0); wait_ms(60);
+        EXPECT(said_since(m, "KEPT FOR THE PAD SLOTS") && !saving, "EDIT's USER SOUNDS: place 13 (a slot's) written");
+      }
       smk_layer = l0; smk_lower = lo0; smk_split = s0;
       /* TAP: four taps 0.5 s apart, 120 BPM */
       float b0 = Q.bpm;
