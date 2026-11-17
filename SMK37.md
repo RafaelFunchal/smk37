@@ -129,6 +129,11 @@ them live (the screen says what is set each time):
 - Together: split bass on the left, piano and pad layered on the right; the drums on the pads (KNOB BANK tapped), and
   the sequencer playing the rest.
 
+**Seeing what is set:** while KNOB BANK is held, the screen shows the **KEYS** page: the layer's and the split's sounds,
+large, each with its track's number and colour, and the split point (KEYS BELOW A#3). Hold KNOB BANK just to look: let go
+without turning a knob, nothing changes (a quick tap still switches DRUM PADS). While you play, the TRACKS page tags the
+rows: **LAYER** on the layered track, **SPLIT <A#3** on the split's (just SPLIT when the sound's name is long).
+
 The sustain pedal holds both parts of a layer. REC records the selected track (the split's and the layer's notes are
 heard, not recorded). The layer and the split are saved with the project (and come back when it opens).
 
