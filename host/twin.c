@@ -2311,6 +2311,24 @@ static void sc_smk(void)
           int want = (int)(1u + (Q.tick / (2u * SEQ_TPS) & 7u)), d = (V.batt_usb - want + 8) % 8; ok += d == 0 || d == 7; }
       tap(B_PLAY); wait_ms(200); seq_set_bpm(&Q, b0);
       EXPECT(all > 100 && ok == all, "the USB light while playing: off the sequencer's eighths (%d of %d)", ok, all); }
+    /* the word BPM blinks at the tempo: stopped, a blink a beat; playing, on the sequencer's beats, green on the first */
+    { float b0 = Q.bpm; seq_set_bpm(&Q, 120.0f); wait_ms(300);
+      int on = 0, last = V.bpm_lit; for (int i = 0; i < 200; i++) { wait_ms(10); if (V.bpm_lit && !last) on++; last = V.bpm_lit; }
+      printf("[%8.3f]    the word BPM, stopped at 120: %d blinks in 2 s\n", tw_s(), on);
+      EXPECT(on >= 3 && on <= 5, "the word BPM at 120 BPM: %d blinks in 2 s (4)", on);
+      tap(B_PLAY); wait_ms(200);
+      int ok = 0, all = 0, green = 0, shot_lit = 0;
+      for (int i = 0; i < 250; i++) { wait_ms(10); if (!Q.playing) continue; all++;
+          uint32_t t = Q.tick; int ph = (int)(t % (4u * SEQ_TPS)), want = ph < 2 * SEQ_TPS ? (t % SEQ_BAR < 4u * SEQ_TPS ? 2 : 1) : 0;
+          int near = ph < 48 || (ph >= 2 * SEQ_TPS && ph < 2 * SEQ_TPS + 48);   /* (the view: a frame behind, ~60 ms at 120) */
+          ok += V.bpm_lit == want || near; green += V.bpm_lit == 2;
+          if (V.bpm_lit == 2 && !shot_lit) { shot_lit = 1; shot("smk-bpm-lit"); } }
+      tap(B_PLAY); wait_ms(200);
+      seq_set_bpm(&Q, 90.0f); tap(B_PLAY);                     /* (two digits: the word itself, for the eye) */
+      for (int i = 0; i < 300 && V.bpm_lit != 2; i++) wait_ms(5);
+      wait_ms(40); shot("smk-bpm-90");
+      tap(B_PLAY); wait_ms(200); seq_set_bpm(&Q, b0);
+      EXPECT(all > 150 && ok == all && green > 0, "the word BPM while playing: off the beats (%d of %d, %d green)", ok, all, green); }
     /* HOME > SCREEN > TEXT: LARGE (kept with the project, sc_smk_reboot) */
     m = msg_mark(); home_knob(1, 2, 1); wait_ms(100);
     EXPECT(ui_large == 1 && said_since(m, "TEXT: LARGE"), "HOME > SCREEN > TEXT: not LARGE (%d)", ui_large);

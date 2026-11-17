@@ -1118,6 +1118,15 @@ COLD static void fill_view(ui_view *v)
     if (!usb_midi_ready()) v->batt_usb = 0u;
     else if (Q.playing || countin) v->batt_usb = (uint8_t)(1u + ((Q.playing ? Q.tick : cin_ticks) / (2u * SEQ_TPS) & 7u));
     else { float bpm = Q.bpm > 20.0f ? Q.bpm : 120.0f; v->batt_usb = (uint8_t)(1u + ((now / ((uint32_t)(30000000.0f / bpm) * lsb)) & 7u)); }
+    /* the word BPM by the tempo: lit a beat's first half, green on a bar's first beat while the sequencer plays (or
+     * counts in), on its own beats; stopped, at the tempo the knob sets */
+    if (Q.playing || countin) {
+        uint32_t t = Q.playing ? Q.tick : cin_ticks;
+        v->bpm_lit = (uint8_t)(t % (4u * SEQ_TPS) < 2u * SEQ_TPS ? (t % SEQ_BAR < 4u * SEQ_TPS ? 2u : 1u) : 0u);
+    } else {
+        float bpm = Q.bpm > 20.0f ? Q.bpm : 120.0f; uint32_t per = (uint32_t)(60000000.0f / bpm) * lsb;
+        v->bpm_lit = (uint8_t)(now % per < per / 2u);
+    }
 #else
     v->batt_usb = usb_midi_ready() ? (uint8_t)(1u + ((now / (250000u * lsb)) & 7u)) : 0u;   /* (a computer: it powers and charges) */
 #endif

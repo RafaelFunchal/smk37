@@ -84,6 +84,9 @@ typedef struct {
     const char *info;                              /* 3.3: what just changed: in the page's own title line, nothing covered */
     uint8_t saving, save_pct;
     uint8_t batt, batt_usb;                        /* (3.3.6) the battery: 0..100 % (255: not read yet); USB: 1..8, the light's step */
+#if BOARD_SMK37
+    uint8_t bpm_lit;                               /* the word BPM lit, at the tempo: 0 dim, 1 a beat's first half, 2 a bar's first beat */
+#endif
 } ui_view;
 
 void ui_draw(const ui_view *v);

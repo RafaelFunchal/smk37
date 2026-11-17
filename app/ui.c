@@ -162,13 +162,27 @@ static void sincos_(float a, float *sn, float *cs)       /* a in radians, to abo
 
 /* ---------------------------------------------------------------- the top bar */
 static void info_line(const ui_view *v, int x, int y, int w, int h);
+#if BOARD_SMK37
+/* the word BPM after the tempo's digits (ending at e), blinking at the tempo: lit a beat's first half, green on a bar's
+ * first beat. Where it would run into the transport (three digits, or the LARGE text), a dot blinks there instead */
+static void bpm_word(const ui_view *v, int e)
+{
+    uint16_t c = v->bpm_lit == 2 ? GREEN : v->bpm_lit ? TXT : DIM;
+    if (e + 4 + gfx_text_w(FS, "BPM") <= 100) gfx_text(FS, e + 4, 5 + font_l.cap - FS->cap, "BPM", c);
+    else gfx_disc(e + 8, 5 + font_l.cap / 2, 4, v->bpm_lit ? c : LINE);   /* (mid-height: not a decimal point) */
+}
+#endif
 static void top_bar(const ui_view *v)
 {
     if (!gfx_visible(0, 0, GFX_W, TOP_H)) return;
     if (v->info) {                                        /* (the tempo stays; the transport and the status give way) */
         char t[8], *q = put_u(t, v->bpm); *q = 0;
         int e = gfx_text(&font_l, 4, 5, t, TXT);
+#if BOARD_SMK37
+        bpm_word(v, e);
+#else
         gfx_text(FS, e + 4, 5 + font_l.cap - FS->cap, "BPM", DIM);
+#endif
         info_line(v, 100, 2, 136, TOP_H - 4);
         return;
     }
@@ -176,7 +190,11 @@ static void top_bar(const ui_view *v)
     /* the tempo */
     p = put_u(b, v->bpm); *p = 0;
     int e = gfx_text(&font_l, 4, 5, b, TXT);
+#if BOARD_SMK37
+    bpm_word(v, e);
+#else
     gfx_text(FS, e + 4, 5 + font_l.cap - FS->cap, "BPM", DIM);
+#endif
     /* the transport: an icon, the bar and beat, the four beats */
     int x = 104;
     if (v->recording) gfx_disc(x + 7, 13, 7, RED);
