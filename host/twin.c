@@ -2279,6 +2279,14 @@ static void sc_smk(void)
     EXPECT(smk_kv == KV_HARD && tw_vel_mode == KV_HARD, "KEY VEL: %d (the panel %d)", smk_kv, tw_vel_mode);
     EXPECT(smk_sens == 2 && tw_pad_sens == 2, "PAD SENS: %d (the panel %d)", smk_sens, tw_pad_sens);
     EXPECT(smk_light == 1 && smk_krev == 1 && tw_knob_rev == 1, "PAD LIGHT %d, KNOBS %d (the panel %d)", smk_light, smk_krev, tw_knob_rev);
+    /* K2: the settings' page 2/2, PADS PLAY: DRUMS (kept with the project: sc_smk_reboot) */
+    { int was = smk_drumpads; if (was) { xtap(SB_KNOB_BANK); wait_ms(60); }
+      turn(ENC_SELECT, 1); wait_ms(80);
+      EXPECT(sticky == PG_SMKSET && !strncmp(V.page_name, "SMK-37 2/2", 10), "K2: not the settings' page 2/2 (%s)", V.page_name);
+      m = msg_mark(); turn(ENC_KNOB1, 1); wait_ms(80); shot("smk-settings-2");
+      EXPECT(smk_drumpads && tw_padmode && said_since(m, "PADS: THE DRUM KIT"), "PADS PLAY: not DRUMS (%d, the panel %d)", smk_drumpads, tw_padmode);
+      turn(ENC_SELECT, -1); wait_ms(80);
+      EXPECT(!strncmp(V.page_name, "SMK-37 1/2", 10), "K2 back: not the settings' page 1/2 (%s)", V.page_name); }
     lr_together();
     EXPECT(sticky == PG_SMKTEST, "< > again: not PANEL TEST (%d)", sticky);
     m = msg_mark(); tap(B_HOME); wait_ms(80);
@@ -2295,6 +2303,22 @@ static void sc_smk(void)
     /* K1, MASTER: turned, the screen says the volume */
     { extern int tw_pot; m = msg_mark(); int p0 = tw_pot; tw_pot = p0 + 48; wait_ms(120);
       EXPECT(said_since(m, "VOLUME "), "K1 (MASTER) turned: no VOLUME on the screen"); tw_pot = p0; wait_ms(120); }
+    /* the piano presets: dry (no DIST, CHORUS, DELAY or REVERB); a note let go and over, nothing left: no tail */
+    { const char *const PN[6] = { "CONCERT", "STUDIO GRND", "VINTAGE UP", "JAZZ GRAND", "SOFT PIANO", "BRIGHT PNO" };
+      int t0 = trk;
+      for (int i = 0; i < 6; i++) {
+          apply_preset(t0, preset_named(PN[i])); wait_ms(60);
+          gb_track *k = &S.trk[t0];
+          EXPECT(k->send_rev.tgt == 0.0f && k->send_dly.tgt == 0.0f && k->send_cho.tgt == 0.0f && gb_pv(k->patch.p, SP_DIST) == 0,
+                 "%s: not dry (REV %.2f, ECHO %.2f, CHO %.2f, DIST %d)", PN[i], k->send_rev.tgt, k->send_dly.tgt, k->send_cho.tgt, gb_pv(k->patch.p, SP_DIST));
+      }
+      int8_t ly = smk_layer, lo = smk_lower; smk_layer = smk_lower = -1;   /* (the piano alone: a layered sound has its own sends) */
+      apply_preset(t0, preset_named("CONCERT")); wait_ms(4000);          /* (whatever rang before: gone) */
+      tw_vel[7] = 110; keydown(7); double held = peak_over(400); keyup(7);
+      wait_ms(2500); double tail = peak_over(1000);                      /* (the note is over by 1.5 s: its damper and its release) */
+      smk_layer = ly; smk_lower = lo;
+      printf("[%8.3f]    CONCERT, dry: held peak %.4f; 2.5-3.5 s after the release, %.9f\n", tw_s(), held, tail);
+      EXPECT(held > 0.005 && tail < 1e-7, "CONCERT: something still sounds after the note is over (%.9f): an effect's tail", tail); }
     /* the USB light along the bottom: at the tempo (an eighth a step), on the sequencer's eighths while it plays */
     { float b0 = Q.bpm; int steps[2];
       for (int k = 0; k < 2; k++) {
@@ -2365,6 +2389,7 @@ static void sc_smk_reboot(void)                  /* after sc_smk's flash: the pr
     int t = synth_trk();
     EXPECT(S.trk[t].patch.engine == ENG_PIANO, "SMK-37: the track's piano not kept (engine %d)", S.trk[t].patch.engine);
     EXPECT(ui_large == 1, "SMK-37: TEXT LARGE not kept");
+    EXPECT(smk_drumpads == 1, "SMK-37: PADS PLAY DRUMS not kept");
     EXPECT(smk_kv == KV_HARD && smk_sens == 2 && smk_light == 1 && smk_krev == 1, "SMK-37: the settings not kept (%d %d %d %d)", smk_kv, smk_sens, smk_light, smk_krev);
     EXPECT(smk_layer == smk_trk_shown(1) && smk_lower == smk_trk_shown(2) && smk_split == 5, "SMK-37: KEYS not kept with the project (layer %d, split's track %d, split %d)", smk_layer, smk_lower, smk_split);
     keydown(9); wait_ms(80);

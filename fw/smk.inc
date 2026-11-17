@@ -231,14 +231,18 @@ static const char *const SMK_KV_NAME[KV_N] = { "DYNAMIC", "SOFT", "HARD", "FIX 6
 static const char *const SMK_SENS_NAME[4] = { "LOW", "MID", "HIGH", "MAX" };
 static const char *const SMK_LIGHT_NAME[3] = { "100 %", "50 %", "25 %" };
 static void smk_settings_apply(void) { smk_vel_mode(smk_kv); smk_pad_sens(smk_sens); smk_pad_dim(smk_light); smk_knob_dir(smk_krev); }
+static uint8_t smk_setpg;                                    /* (SMK-37 SETTINGS: 0 its page 1/2, 1 its page 2/2) */
 static uint8_t smk_page_back;                                /* the page before them */
 COLD static void smk_pages_next(void)
 {
     if (sticky == PG_SMKSET) { sticky = PG_SMKTEST; say("PANEL TEST: EVERY INPUT SHOWN · < > TOGETHER: BACK"); }
     else if (sticky == PG_SMKTEST) sticky = smk_page_back;
-    else { smk_page_back = (uint8_t)sticky; sticky = PG_SMKSET; }
+    else { smk_page_back = (uint8_t)sticky; sticky = PG_SMKSET; smk_setpg = 0; }
     vis_on = 0;
 }
+/* SMK-37 SETTINGS: K2 turns between its two pages (as HOME's): 1/2 TOUCH, SENS (the pads'), LIGHT, KNOBS; 2/2 PADS:
+ * NOTES or DRUMS (as KNOB BANK tapped) */
+COLD static void smk_drumpads_say(void) { say(smk_drumpads ? "PADS: THE DRUM KIT" : "PADS: THE WHITE KEYS"); }
 COLD static void smk_page_knobs(void)
 {
     static const char *const KN[7] = { "K2", "K3", "K5", "K6", "K7", "K8", "K4" };   /* (the FM-1's ids: fm1.h ENC_*) */
@@ -253,6 +257,11 @@ COLD static void smk_page_knobs(void)
             continue;
         }
         int s = d > 0 ? 1 : -1;
+        if (e == ENC_SELECT) { smk_setpg = (uint8_t)(s > 0); continue; }
+        if (smk_setpg) {                                            /* (2/2: the pads play the notes, or the drum kit) */
+            if (e == ENC_KNOB1 && smk_drumpads != (uint8_t)(s > 0)) { smk_drumpads = (uint8_t)(s > 0); smk_drumpads_say(); }
+            continue;
+        }
         if (e == ENC_KNOB1) smk_kv = (uint8_t)(smk_kv + s < 0 ? 0 : smk_kv + s >= KV_N ? KV_N - 1 : smk_kv + s);
         else if (e == ENC_KNOB2) smk_sens = (uint8_t)(smk_sens + s < 0 ? 0 : smk_sens + s > 3 ? 3 : smk_sens + s);
         else if (e == ENC_KNOB3) smk_light = (uint8_t)(smk_light + s < 0 ? 0 : smk_light + s > 2 ? 2 : smk_light + s);
@@ -273,9 +282,10 @@ COLD static void smk_view(ui_view *v, int pg)
     char *p;
     if (pg == PG_SMKSET) {
         v->page = UI_GENERIC;
-        put_s(v->page_name, "SMK-37 · < > TOGETHER: TEST")[0] = 0;
+        put_s(v->page_name, smk_setpg ? "SMK-37 2/2 · < >: TEST" : "SMK-37 1/2 · < >: TEST")[0] = 0;
+        if (smk_setpg) { knob(v, 0, "PADS", smk_drumpads ? "DRUMS" : "NOTES", smk_drumpads * 100, 0); return; }
         knob(v, 0, "TOUCH", SMK_KV_NAME[smk_kv % KV_N], smk_kv * 20, 0);      /* (the keys' and pads' velocity) */
-        knob(v, 1, "PADS", SMK_SENS_NAME[smk_sens & 3], smk_sens * 33, 0);    /* (how firm a hit must be) */
+        knob(v, 1, "SENS", SMK_SENS_NAME[smk_sens & 3], smk_sens * 33, 0);    /* (the pads: how firm a hit must be) */
         knob(v, 2, "LIGHT", SMK_LIGHT_NAME[smk_light % 3], 100 - smk_light * 40, 0);
         knob(v, 3, "KNOBS", smk_krev ? "REVERSE" : "NORMAL", smk_krev * 100, 0);
         return;
@@ -304,7 +314,6 @@ COLD static void smk_view(ui_view *v, int pg)
     }
 }
 /* ---- the extra buttons */
-static uint8_t smk_drumpads;
 COLD static void smk_xbtns(void)
 {
     uint32_t rel, pr = smk_xbutton_edges(&rel);
@@ -317,7 +326,7 @@ COLD static void smk_xbtns(void)
     }
     if (pr & (1u << SB_FADER_BANK)) smk_fader_bank((held_btn & (1u << BTN_OCT_DOWN)) ? -1 : 1);
     if (pr & (1u << SB_KNOB_BANK)) smk_kb_used = 0;
-    if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used) { smk_drumpads = (uint8_t)!smk_drumpads; say(smk_drumpads ? "PADS: THE DRUM KIT" : "PADS: THE WHITE KEYS"); }
+    if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used) { smk_drumpads = (uint8_t)!smk_drumpads; smk_drumpads_say(); }   /* (kept with the project) */
     {   /* < and > together: the SMK-37's pages; alone, each acts when let go (the first of a pair does nothing) */
         static uint8_t combo;
         const uint32_t LR = (1u << SB_LEFT) | (1u << SB_RIGHT);

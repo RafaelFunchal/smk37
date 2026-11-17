@@ -95,6 +95,7 @@ static void smk_keys_init(void);
 static uint32_t smk_as_hits;                      /* (the panel's press count when the last save began: an autosave stops at a press) */
 static int8_t smk_layer, smk_lower, smk_split;  /* (fw/smk.inc: KEYS, kept with the project: proj_extra, home_from) */
 static uint8_t smk_kv, smk_sens, smk_light, smk_krev;   /* (fw/smk.inc: the SMK-37's settings, kept with the project too) */
+static uint8_t smk_drumpads;                       /* (fw/smk.inc: PADS PLAY DRUMS, KNOB BANK's too: kept with the project) */
 static void smk_settings_apply(void);
 static void smk_view(ui_view *v, int pg);
 static void smk_page_knobs(void);
@@ -1743,6 +1744,7 @@ COLD static void proj_extra(project_extra *xp)
     x.home[79] = (uint8_t)(smk_split > -100 ? smk_split + 64 : 0);
     /* (and its settings, in the FM-1's calibration bytes, never used on the SMK-37: byte 10 stays 0xFF, not 1) */
     x.home[11] = smk_kv; x.home[12] = smk_sens; x.home[13] = smk_light; x.home[14] = smk_krev; x.home[15] = ui_large;
+    x.home[16] = smk_drumpads;
 #endif
     *xp = x;
 }
@@ -1808,6 +1810,7 @@ COLD static void home_from(const uint8_t *h)
         if (h[13] <= 2) smk_light = h[13];
         if (h[14] <= 1) smk_krev = h[14];
         if (h[15] <= 1) ui_large = h[15];
+        if (h[16] <= 1) smk_drumpads = h[16];                 /* (PADS PLAY; older projects: 0xFF, left as it is) */
     }
     smk_settings_apply();
 #endif
