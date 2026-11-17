@@ -361,8 +361,8 @@ footer a{color:var(--ink2)}
 <script>
 __FWPKG__
 const AREA = Uint8Array.from(atob("__AREA__"), c => c.charCodeAt(0));
-/* the board this page installs for (tools/mkpage.py): "fm1", or "smk37" with its piano bank (flash 0x78000, in clear) */
-const BOARD = "__BOARD__", SMK = BOARD === "smk37";
+/* the board this page installs for (tools/mkpage.py): "fm1", or "smk37" with its piano bank (in clear, at PIANO_AT) */
+const BOARD = "__BOARD__", SMK = BOARD === "smk37", PIANO_AT = SMK ? __PIANO_AT__ : 0;
 const PIANO = SMK ? Uint8Array.from(atob("__PIANO__"), c => c.charCodeAt(0)) : null;
 const VERSION = "__VERSION__";
 const W = typeof window !== 'undefined' ? window : {};
@@ -570,7 +570,7 @@ function onMsg(e) {
     key = m[14] | m[15] << 8; cap = le32(m, 16) || 0x100000;
     const ver = ascii(m, 6 + 28);
     log(T.mb + ver + (m[12] === 2 ? T.stage : '') + T.key + key.toString(16).toUpperCase().padStart(4, '0'), 'ok');
-    pk = buildPackage(AREA, key, null, SMK ? { at: 0x78000, bytes: PIANO } : null);
+    pk = buildPackage(AREA, key, null, SMK ? { at: PIANO_AT, bytes: PIANO } : null);
     const bad = checkPackage(pk, key, SMK ? 0xC0000 : 0x7A000);
     if (bad) { problem('err3', fmt(T.badpkg, { e: bad }), ''); state = 'idle'; return; }
     state = 'board';                                     /* the keyboard's model, read before anything else (below) */

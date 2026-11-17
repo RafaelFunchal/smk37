@@ -93,6 +93,11 @@ static int smk_keys_setup_key(int k);
 static void smk_keys_setup_knobs(void);
 static void smk_keys_init(void);
 static int8_t smk_layer, smk_lower, smk_split;  /* (fw/smk.inc: KEYS, kept with the project: proj_extra, home_from) */
+static uint8_t smk_kv, smk_sens, smk_light, smk_krev;   /* (fw/smk.inc: the SMK-37's settings, kept with the project too) */
+static void smk_settings_apply(void);
+static void smk_view(ui_view *v, int pg);
+static void smk_page_knobs(void);
+static void smk_test_buttons(void);
 static uint64_t smk_sus_keys;
 #else
 #define SMK_LOWBSS
@@ -104,6 +109,12 @@ static uint64_t smk_sus_keys;
 /* COLD: a function of the interface, run from the flash window (fw/ram.ld .xtext); never called while the window is
  * off (a save's flash work: fw/main.c's loop runs only the sound, the panel and the flash then) */
 #define COLD __attribute__((section(".xtext.main")))
+/* SMK_COLD: COLD on the SMK-37 (its RAM's room: the panel, the piano), as it was on the FM-1 (its build unchanged) */
+#if BOARD_SMK37
+#define SMK_COLD COLD
+#else
+#define SMK_COLD
+#endif
 /* RAMCONST: a table the audio block reads (main.o's other constants are in the window: fw/ram.ld) */
 #define RAMCONST __attribute__((section(".data.ramconst")))
 #define HALF_FRAMES 256u
@@ -155,7 +166,7 @@ static uint16_t TRK_COL[NTRK] = { RGB(80, 160, 255), RGB(80, 230, 120), RGB(255,
 /* HOME > SCREEN > COLOR: the built-in palettes (app/ui.h), then your theme (UI_NTHEMES, when there is one: SLOOP 2.7's
  * theme, or the web editor's) with its tracks' colours */
 static uint8_t scr_color;
-static int theme_ok(void)
+SMK_COLD static int theme_ok(void)
 {
     const uint8_t *t = us_theme;
     return (t[0] | t[1] << 8 | t[2] << 16 | (uint32_t)t[3] << 24) == 0x324D4854u && (t[36] | t[37] << 8 | t[38] << 16 | (uint32_t)t[39] << 24) == crc32_ieee(0, t, 36);
@@ -176,7 +187,11 @@ static const char *const PAD[16] = { "KICK", "KICK2", "SNARE", "CLAP", "HAT", "O
  * voices, -1: nothing); a drum kit has four */
 enum { PG_TRACKS, PG_STEPS, PG_OSC, PG_FILTER, PG_VOICE, PG_ENV, PG_ENVDEST, PG_FX, PG_KIT, PG_GLOBAL, PG_SONG,
        PG_LFO, PG_SEL, PG_ARP, PG_LFODEST, PG_MASTER, PG_PLAY, PG_ARP2, PG_FX2, PG_DSOUND, PG_SEL2, PG_MIDI, PG_MIDI2, PG_NOTES,
-       PG_LFO3, PG_INS, PG_INSMIX, PG_SLC, PG_USER, PG_TEX1, PG_TEX2, PG_SONG2, PG_SND, PG_FX3, PG_GREC };
+       PG_LFO3, PG_INS, PG_INSMIX, PG_SLC, PG_USER, PG_TEX1, PG_TEX2, PG_SONG2, PG_SND, PG_FX3, PG_GREC
+#if BOARD_SMK37
+       , PG_SMKSET, PG_SMKTEST                 /* (fw/smk.inc: the SMK-37's settings and its PANEL TEST; < and > together) */
+#endif
+};
 #define NFX_PG 7
 static const uint8_t EDIT_PG[6] = { PG_OSC, PG_FILTER, PG_VOICE, PG_PLAY, PG_USER, PG_SND }, FX_PG[NFX_PG] = { PG_FX, PG_INS, PG_INSMIX, PG_SLC, PG_FX2, PG_FX3, PG_MASTER };
 static const uint8_t LFO_PG[3] = { PG_LFO, PG_LFODEST, PG_LFO3 };
@@ -260,7 +275,7 @@ static int click_mode;                      /* 0 OFF, 1 REC (while a track recor
  * clicks, then it records), QUANT (the track's grid pull: ON, or OFF: as played). Kept as the MIDI settings are */
 static uint8_t rec_mode, rec_bars = 1, rec_count, rec_keep;   /* rec_bars: 1, 2, 4; rec_keep (3.3.6, GLO REC 6/6): a track changed while recording, the take goes on there (else REC stops) */
 static int countin, cin_trk; static uint32_t cin_ticks;     /* the count-in under way, its track, its ticks so far */
-static int project_empty(void);
+SMK_COLD static int project_empty(void);
 static const char *const CLICK_NAME[3] = { "OFF", "REC", "ON" };
 /* the delay's time, in 1/24 of a beat, following the tempo */
 static const struct { uint8_t b24; const char *name; } DIV[] = { { 3, "1/32" }, { 6, "1/16" }, { 8, "1/8T" }, { 9, "1/16." },
@@ -269,7 +284,7 @@ static const struct { uint8_t b24; const char *name; } DIV[] = { { 3, "1/32" }, 
 static int dly_div = 6;                     /* a dotted eighth */
 /* the delay's COLR and MIX, the reverb's DAMP, the chorus's rate: SLOOP's 0..127 (GLO > DLY, REV/CHO) */
 static uint8_t fxv[4] = { 70, 90, 60, 40 };
-static void fxv_apply(void)
+SMK_COLD static void fxv_apply(void)
 {
     S.dly_damp = 0.7f * (1.0f - (float)fxv[0] * (1.0f / 127.0f)); S.dly_mix = (float)fxv[1] * (1.0f / 90.0f);
     S.rev_damp = 0.75f * (float)fxv[2] * (1.0f / 127.0f); S.cho_rate = 0.6f * gb_exp2f(((float)fxv[3] - 40.0f) * (1.0f / 24.0f));
@@ -308,7 +323,7 @@ static char fb_nm[FM6_NBANK][11] __attribute__((section(".lowbss")));   /* (clea
 static uint8_t fb_scan;
 /* an FM6 track's PTCH, in the engine's own range (until 3.2 read on the 0..127 scale of the shared values: B1 was
  * taken for B23, its voice never the one the engine waited for, and every bank voice played as the INIT voice) */
-static int fm6_ptch(int t) { return (int)gb_ev(&S.trk[t].patch, 7); }
+SMK_COLD static int fm6_ptch(int t) { return (int)gb_ev(&S.trk[t].patch, 7); }
 static int fb_ok(int k) { return k >= 0 && k < FM6_NBANK && fm6_bank_at && ((fm6_bank_used >> k) & 1u); }
 COLD static const char *fb_name(int k)
 {
@@ -433,14 +448,14 @@ static void sq_locks(seq_t *s, int t, const seq_lock *lk, int n)
         }
     }
 }
-static void base_from_sound(void) { for (int t = 0; t < NTRK; t++) for (int i = 0; i < GB_NPARAM; i++) base[t][i] = S.trk[t].patch.p[i]; }
+SMK_COLD static void base_from_sound(void) { for (int t = 0; t < NTRK; t++) for (int i = 0; i < GB_NPARAM; i++) base[t][i] = S.trk[t].patch.p[i]; }
 COLD static int lock_own(int t, int k)                     /* a lock's starting value: the track's own */
 {
     if (k < GB_NPARAM) return (int)(base[t][k] * 255.0f + 0.5f);
     int m = k - SEQ_LK_LEVEL; float x = ((mix_held[t] >> m) & 1u) ? mix_own[t][m] : mix_of(t, m)->tgt;
     return (int)((m == 5 ? (x + 1.0f) * 0.5f : x) * 255.0f + 0.5f);
 }
-static void base_of_track(int t) { mix_back(t); for (int i = 0; i < GB_NPARAM; i++) base[t][i] = S.trk[t].patch.p[i]; Q.t[t].lock_step = -1; }
+SMK_COLD static void base_of_track(int t) { mix_back(t); for (int i = 0; i < GB_NPARAM; i++) base[t][i] = S.trk[t].patch.p[i]; Q.t[t].lock_step = -1; }
 /* each pattern's own sound (app/psound.h): the live sound is the current pattern's; a pattern change swaps them */
 static psounds PS __attribute__((section(".lowbss")));          /* (ps_all fills it before it is read) */
 static int preset_of[NTRK];
@@ -650,7 +665,7 @@ static int last_notes[NTRK] = { 45, 57, 69, 0, 57 };   /* each track's last note
 static int drum_note_of_key(int k) { while (k > 0 && white_of[k] < 0) k--; return white_of[k] < 0 ? 0 : white_of[k]; }
 static int is_slice(int t) { return S.trk[t].patch.engine == ENG_SLICE; }
 /* a key's note: the drums' pads by white key; SLICE: the lowest key is slice 0 (note 60, engine/slice.c); else F3 up */
-static int note_of_key(int k) { return is_drum(trk) ? drum_note_of_key(k) : is_slice(trk) ? 60 + k + 12 * oct : 53 + k + 12 * oct; }
+SMK_COLD static int note_of_key(int k) { return is_drum(trk) ? drum_note_of_key(k) : is_slice(trk) ? 60 + k + 12 * oct : 53 + k + 12 * oct; }
 COLD static void note_name(char *p, int t, int n)
 {
     static const char NM[12][3] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
@@ -1384,6 +1399,10 @@ COLD static void fill_view(ui_view *v)
             knob_n(v, 3, "UNDO", HIST.n_undo, -1);
             for (int i = 0; i < 4; i++) v->knob[i].dial = 0;
         }
+#if BOARD_SMK37
+    } else if (layer < 0 && pg >= PG_SMKSET) {
+        smk_view(v, pg);                                    /* (fw/smk.inc: SMK-37 SETTINGS, PANEL TEST) */
+#endif
     } else {
         v->page = UI_SOON;
         static const char *const TITLE[] = { "", "", "OSC 1/6", "FILTER 2/6", "VOICE 3/6", "ENV 1/2", "ENV DEST 2/2", "SENDS 1/7", "KIT", "GLOBAL 1/6", "", "LFO 1/3", "SEL", "ARP 1/2", "LFO DEST 2/3", "MASTER 7/7", "PLUS 4/6", "ARP 2/2", "DELAY 5/7", "SOUND 2/2", "SEL 2/2", "MIDI 4/6", "MIDI 5/6", "NOTES", "LFO TRIG 3/3", "INSERT 2/7", "INSERT MIX 3/7", "SLICER 4/7", "USER SOUNDS 5/6", "TEXTURE 2/6", "TEXTURE 3/6", "SONG", "SOUNDS 6/6", "REV · CHO 6/7" , "REC 6/6" };
@@ -1691,6 +1710,8 @@ COLD static void proj_extra(project_extra *xp)
      * 79 the split point + 64 (0: none). Older projects have 0xFF there: none) */
     x.home[77] = (uint8_t)(smk_layer + 1); x.home[78] = (uint8_t)(smk_lower + 1);
     x.home[79] = (uint8_t)(smk_split > -100 ? smk_split + 64 : 0);
+    /* (and its settings, in the FM-1's calibration bytes, never used on the SMK-37: byte 10 stays 0xFF, not 1) */
+    x.home[11] = smk_kv; x.home[12] = smk_sens; x.home[13] = smk_light; x.home[14] = smk_krev;
 #endif
     *xp = x;
 }
@@ -1750,6 +1771,13 @@ COLD static void home_from(const uint8_t *h)
     smk_layer = h[77] >= 1 && h[77] <= NTRK ? (int8_t)(h[77] - 1) : -1;
     smk_lower = h[78] >= 1 && h[78] <= NTRK ? (int8_t)(h[78] - 1) : -1;
     smk_split = h[79] >= 64 - 5 && h[79] <= 64 + 31 ? (int8_t)(h[79] - 64) : -100;
+    if (h[10] != 1) {                                         /* (an FM-1's calibration there: not settings) */
+        if (h[11] < KV_N) smk_kv = h[11];
+        if (h[12] <= 3) smk_sens = h[12];
+        if (h[13] <= 2) smk_light = h[13];
+        if (h[14] <= 1) smk_krev = h[14];
+    }
+    smk_settings_apply();
 #endif
     if (h[10] == 1) {
         uint8_t b[14], e[7]; int8_t d[7];
@@ -2072,7 +2100,7 @@ COLD static void transport(int on)                       /* PLAY, and the clock 
         seq_play(&Q, 0); recording_armed = 0;
     }
 }
-static void step_write(int st, int on);
+SMK_COLD static void step_write(int st, int on);
 static void record_now(int t)                       /* REC armed: the loop from step 1, recording track t */
 {
     seq_play(&Q, 1); seq_record(&Q, 1, t); recording_armed = 0; mclk_start(&MK);
@@ -2113,12 +2141,12 @@ static void ed_pump(void)                                   /* the answer out, a
     }
     ed_tx_n = ed_tx_at = 0;
 }
-static void ed_send(int cmd, uint32_t n) { if (ed_tx_n) return; ed_tx_n = ed_frame(cmd, ed_raw, n, ed_tx, sizeof ed_tx); ed_tx_at = 0; ed_pump(); }
+SMK_COLD static void ed_send(int cmd, uint32_t n) { if (ed_tx_n) return; ed_tx_n = ed_frame(cmd, ed_raw, n, ed_tx, sizeof ed_tx); ed_tx_at = 0; ed_pump(); }
 static void ed_err(int code) { ed_raw[0] = (uint8_t)code; ed_send(ED_NONE, 1); }
 static void ed_w16(uint8_t *b, int v) { b[0] = (uint8_t)v; b[1] = (uint8_t)((unsigned)v >> 8); }
 static void ed_w32(uint8_t *b, uint32_t v) { for (int i = 0; i < 4; i++) b[i] = (uint8_t)(v >> (8 * i)); }
 static uint32_t ed_r32(const uint8_t *b) { return b[0] | b[1] << 8 | b[2] << 16 | (uint32_t)b[3] << 24; }
-static const gb_pd *ed_pd(int e, int k) { static const gb_pd none = { 0, 0, 0 }; return k < 8 ? &gb_engines[e < gb_nengines ? e : 0]->ed[k] : k < SP_N ? &gb_sp[k] : &none; }
+SMK_COLD static const gb_pd *ed_pd(int e, int k) { static const gb_pd none = { 0, 0, 0 }; return k < 8 ? &gb_engines[e < gb_nengines ? e : 0]->ed[k] : k < SP_N ? &gb_sp[k] : &none; }
 COLD static void ed_request(void);
 COLD static int us_bank(void);
 /* a user sample slot written from the editor (SLOOP's "FSMP" layout, where SLOOP keeps it: SLOOP 2.8 reads it too) */
@@ -2190,7 +2218,7 @@ COLD static void midi_note(int ch, int t, int n, int vel)
 }
 COLD static void edited(int t) { if (preset_of[t] >= 0) preset_of[t] = -preset_of[t] - 2; }
 /* ---------------------------------------------------------------- MIDI LEARN (GLO + F#3), REMOTE, the FX channel */
-static const char *ml_label(int t, int code, char *b)
+SMK_COLD static const char *ml_label(int t, int code, char *b)
 {
     char *p = b; *p++ = 'T'; *p++ = (char)('1' + t); *p++ = ' ';
     p = put_s(p, code == ML_LEVEL ? "LVL" : code == ML_PAN ? "PAN" : code == ML_DLY ? "DLY" : code == ML_REV ? "REV" : code == ML_CHO ? "CHO"
@@ -3273,6 +3301,9 @@ COLD static void open_page(int b)
 }
 COLD static void buttons(void)
 {
+#if BOARD_SMK37
+    if (sticky == PG_SMKTEST) { held_btn = 0; smk_test_buttons(); return; }   /* (PANEL TEST: a button is named, nothing done) */
+#endif
     uint32_t rel, pr = panel_button_edges(&rel);
     pr |= rm_pr | eb_pr; rel |= rm_rel | eb_rel; rm_pr = rm_rel = eb_pr = eb_rel = 0;   /* (REMOTE: the buttons over MIDI; the editor's) */
     if (!m_rmch) rm_held = 0;
@@ -3614,6 +3645,7 @@ COLD static void encoders(void)
 {
 #if BOARD_SMK37
     if (smk_kb_held()) { smk_keys_setup_knobs(); return; }  /* (KNOB BANK held: K3 the layer, K4 the split's track) */
+    if (sticky >= PG_SMKSET && !lay()) { smk_page_knobs(); return; }   /* (the SMK-37's pages: their own knobs) */
 #endif
     for (int e = 0; e < 7; e++) {
         int d = panel_enc_take(e) + ee[e]; ee[e] = 0;
@@ -4142,7 +4174,11 @@ COLD static int save_now(void)
 COLD __attribute__((noinline)) static void boot_flash(void)
 {
     /* the projects: SPI0 taken from the flash window (we run from RAM), the last project back */
+#if BOARD_SMK37
+    smp_bank_set((const uint8_t *)(uintptr_t)(FLASH_WIN + SMK_BANK_AT - 0x4000u));   /* (the SMK-37: flash 0x4C000, hal/smk37/smk37.h) */
+#else
     smp_bank_set((const uint8_t *)(uintptr_t)(FLASH_WIN + 0x44000u));   /* the sample bank (flash 0x48000, tools/mkfw.py), checked once */
+#endif
     BOOT_STEP(8);
     flash_ok = flash_open() == 0;
 #if BOARD_SMK37

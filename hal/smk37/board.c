@@ -36,7 +36,7 @@ static void spi_wait(void)
 static void spi_byte(uint8_t b) { SPI1_BUF = b; spi_wait(); }
 static void lcd_cmd(uint8_t c) { pin_set(LCD_DC, 0); pin_set(LCD_CS, 0); spi_byte(c); pin_set(LCD_CS, 1); }
 static void lcd_data(const uint8_t *d, int n) { pin_set(LCD_DC, 1); pin_set(LCD_CS, 0); while (n--) spi_byte(*d++); pin_set(LCD_CS, 1); }
-static void lcd_dma(const void *p, uint32_t n)                   /* n bytes from internal RAM, n > 0 */
+__attribute__((section(".xtext.smkboard"))) static void lcd_dma(const void *p, uint32_t n)                   /* n bytes from internal RAM, n > 0 */
 {
     pin_set(LCD_DC, 1); pin_set(LCD_CS, 0);
     const uint8_t *b = (const uint8_t *)p;
@@ -56,7 +56,7 @@ static void lcd_window(int x, int y, int w, int h)
     lcd_cmd(0x2C);
 }
 static uint16_t line[240];
-void lcd_fill(int x, int y, int w, int h, uint16_t rgb565)
+__attribute__((section(".xtext.smkboard"))) void lcd_fill(int x, int y, int w, int h, uint16_t rgb565)
 {
     for (int i = 0; i < w; i++) line[i] = (uint16_t)((rgb565 >> 8) | (rgb565 << 8));   /* high byte first */
     lcd_window(x, y, w, h);

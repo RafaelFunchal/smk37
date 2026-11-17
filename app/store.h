@@ -16,7 +16,11 @@
 #else
 #define STORE_BASE 0x7A000u
 #endif
+#if BOARD_SMK37
+#define STORE_APP_MAX (0x4C000u - 0x4000u)       /* (the SMK-37: its sample bank at 0x4C000, hal/smk37/smk37.h) */
+#else
 #define STORE_APP_MAX (0x48000u - 0x4000u)       /* the firmware must end below the sample bank (3.3.1: 0x48000; 0x4B778 from 3.1.6) */
+#endif
 #define STORE_SLOTS 8
 #define STORE_AREAS 9
 #define STORE_COPY 0x3000u                       /* 12 KB: three sectors */

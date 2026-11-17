@@ -64,14 +64,16 @@ enum { SMK_ADC_A = 1, SMK_ADC_B = 8, SMK_ADC_C = 2 };
  * area [0xFF000, 0x100000). The installer (m-bootloader's MIDI MODE) writes [0x4000, end of the piano bank): the
  * application area, as on the FM-1, then the piano bank, in clear. SLOOP 3's own data lies above the guarded hole,
  * out of an install's reach: an update keeps the projects, the sounds and the sample slot.
- *   0x04000  the application area (the firmware, the sample bank at 0x48000): enciphered, as on the FM-1
- *   0x78000  the piano bank (engine/piano.c, tools/mkpiano.py), in clear, up to 0xC0000
+ *   0x04000  the application area (the firmware, then the sample bank at 0x4C000, 16 KB later than on the FM-1: the
+ *            room for the SMK-37's code), enciphered, as on the FM-1
+ *   0x7C000  the piano bank (engine/piano.c, tools/mkpiano.py), in clear, up to 0xC0000
  *   0xC2000  the user sample slot USR1 (80 KB)
  *   0xD6000  the FM6 bank, 0xD7000 the SYN kits
  *   0xD8000  the project: two banks of 13 sectors
  *   0xF2000  the user sounds, two copies
  */
-#define SMK_PIANO_AT     0x78000u
+#define SMK_BANK_AT      0x4C000u             /* the factory sample bank (the FM-1: 0x48000; fw/build.sh MKFW_BANK_AT) */
+#define SMK_PIANO_AT     0x7C000u             /* (fw/build.sh: mkpiano --base, the installer's tail; the area ends below) */
 #define SMK_PIANO_END    0xC0000u
 #define SMK_SLOT_AT      0xC2000u
 #define SMK_DATA_AT      0xD6000u
@@ -82,6 +84,7 @@ enum { SMK_ADC_A = 1, SMK_ADC_B = 8, SMK_ADC_C = 2 };
 _Static_assert(SMK_PIANO_END <= 0xC0000u, "the piano bank stays below the Bluetooth pairing and the calibration");
 _Static_assert(SMK_WRITE_LO >= 0xC2000u && SMK_WRITE_HI <= 0xF4000u, "writes stay between the calibration and the stock resources");
 _Static_assert(SMK_SLOT_AT + 0x14000u == SMK_DATA_AT, "the slot, then the data");
+_Static_assert(SMK_BANK_AT < SMK_PIANO_AT, "the area (with its bank), then the piano");
 
 static inline int smk_flash_writable(uint32_t a, uint32_t n)   /* [a, a + n) inside the one range we write */
 {

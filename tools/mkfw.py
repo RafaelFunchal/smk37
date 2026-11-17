@@ -21,8 +21,10 @@ def record(data_crc, address, length, attr, name, index=0):
     body = struct.pack("<HIIBBH", data_crc, address, length, attr, 0, index) + name.encode().ljust(16, b"\0")
     return struct.pack("<H", crc16(body)) + body
 
-BANK_AT = 0x44000                                  # the bank's place in the area (flash 0x48000; 3.3.1: the bank made right is larger; 0x47778 in 3.1.6..3.3)
-AREA_END = 0x74000                                 # (flash 0x78000: SLOOP 3's FM6 bank and SYN kits, never reached)
+import os
+BANK_AT = int(os.environ.get("MKFW_BANK_AT", "0x44000"), 0)   # the bank's place in the area (flash 0x48000; 3.3.1: the bank made right is larger; 0x47778 in 3.1.6..3.3;
+                                                               # the SMK-37: 0x48000, flash 0x4C000)
+AREA_END = int(os.environ.get("MKFW_AREA_END", "0x74000"), 0)  # (flash 0x78000: SLOOP 3's FM6 bank and SYN kits, never reached; the SMK-37: 0x78000, its piano)
 def main():
     app = open(sys.argv[1], "rb").read()
     entry, rel = 0x02000120, 0x120

@@ -11,6 +11,8 @@
  *   - WHEELS: pitch bend on the selected synth track (GLO > MIDI 3 BEND, +-1..12), the mod wheel a vibrato
  *   - PEDAL: sustain (the keys' notes held while it is down), CC 64 out
  *   - < >: the previous / next track (SEQ held, or on STEPS: the step page)
+ *   - < and > together: SMK-37 SETTINGS (KEY VELOCITY, PAD SENS, PAD LIGHT, KNOBS), then PANEL TEST (every input
+ *     shown as it is read), then back
  *   - TRS jack: MIDI OUT, what goes out over USB
  *   - KEYS (KNOB BANK held): K3 the LAYER, a second synth track every key plays too (a piano and a pad); K4 the SPLIT's
  *     track, what the keys below the split point play (a bass, the drums); a key pressed: the split point there (the
@@ -150,7 +152,11 @@ static int8_t smk_layer = -1, smk_lower = -1;               /* tracks (-1 none) 
 static int8_t smk_split = -100;                              /* the split point: keys at positions below it play smk_lower */
 static uint8_t smk_kb_used;                                  /* (KNOB BANK held and used: no DRUM PADS on its release) */
 static int8_t smk_lay_trk[PANEL_KEYS] GB_BOOTRAM; static uint8_t smk_lay_n[PANEL_KEYS] GB_BOOTRAM, smk_lay_notes[PANEL_KEYS][5] GB_BOOTRAM;   /* (smk_keys_init) */
-COLD static void smk_keys_init(void) { for (int k = 0; k < PANEL_KEYS; k++) { smk_lay_trk[k] = -1; smk_lay_n[k] = 0; } }
+COLD static void smk_keys_init(void)
+{
+    for (int k = 0; k < PANEL_KEYS; k++) { smk_lay_trk[k] = -1; smk_lay_n[k] = 0; }
+    smk_kv = KV_DYNAMIC; smk_sens = 1; smk_light = 0; smk_krev = 0; smk_settings_apply();
+}
 COLD static int smk_kb_held(void) { return (smk_xbuttons() >> SB_KNOB_BANK) & 1u; }
 COLD static const char *smk_trk_name(int t, char *b)              /* "2 PAD SOFT" / "DRUMS" / "OFF" */
 {
@@ -220,6 +226,83 @@ COLD static void smk_key_on(int k, const uint8_t *n, int nn, float vel, uint32_t
         if (arp_on(L)) arp_add(L, n[i], (int)(vel * 127.0f)); else play_on(GB_OWNER(OWN_KEY, 0), L, n[i], vel);
     }
 }
+/* ---- the SMK-37's pages: SETTINGS (K5..K8), PANEL TEST (< and > together, each in turn, then back) */
+static const char *const SMK_KV_NAME[KV_N] = { "DYNAMIC", "SOFT", "HARD", "FIX 64", "FIX 100", "FIX 127" };
+static const char *const SMK_SENS_NAME[4] = { "LOW", "MID", "HIGH", "MAX" };
+static const char *const SMK_LIGHT_NAME[3] = { "100 %", "50 %", "25 %" };
+static void smk_settings_apply(void) { smk_vel_mode(smk_kv); smk_pad_sens(smk_sens); smk_pad_dim(smk_light); smk_knob_dir(smk_krev); }
+static uint8_t smk_page_back;                                /* the page before them */
+COLD static void smk_pages_next(void)
+{
+    if (sticky == PG_SMKSET) { sticky = PG_SMKTEST; say("PANEL TEST: EVERY INPUT SHOWN · < > TOGETHER: BACK"); }
+    else if (sticky == PG_SMKTEST) sticky = smk_page_back;
+    else { smk_page_back = (uint8_t)sticky; sticky = PG_SMKSET; }
+    vis_on = 0;
+}
+COLD static void smk_page_knobs(void)
+{
+    static const char *const KN[7] = { "K2", "K3", "K5", "K6", "K7", "K8", "K4" };   /* (the FM-1's ids: fm1.h ENC_*) */
+    for (int e = 0; e < 7; e++) {
+        int d = panel_enc_take(e) + ee[e]; ee[e] = 0;
+        if (!d) continue;
+        t_input = time_ticks();
+        if (sticky == PG_SMKTEST) {
+            static int8_t tot[7]; tot[e] = (int8_t)(tot[e] + d);
+            char m[32], *p = put_s(m, "KNOB "); p = put_s(p, KN[e]); p = put_s(p, d > 0 ? " RIGHT +" : " LEFT -"); p = put_u(p, (uint32_t)(d > 0 ? d : -d));
+            p = put_s(p, " · SUM "); if (tot[e] < 0) *p++ = '-'; p = put_u(p, (uint32_t)(tot[e] < 0 ? -tot[e] : tot[e])); *p = 0; say(m);
+            continue;
+        }
+        int s = d > 0 ? 1 : -1;
+        if (e == ENC_KNOB1) smk_kv = (uint8_t)(smk_kv + s < 0 ? 0 : smk_kv + s >= KV_N ? KV_N - 1 : smk_kv + s);
+        else if (e == ENC_KNOB2) smk_sens = (uint8_t)(smk_sens + s < 0 ? 0 : smk_sens + s > 3 ? 3 : smk_sens + s);
+        else if (e == ENC_KNOB3) smk_light = (uint8_t)(smk_light + s < 0 ? 0 : smk_light + s > 2 ? 2 : smk_light + s);
+        else if (e == ENC_KNOB4) smk_krev = (uint8_t)(s > 0);
+        else continue;
+        smk_settings_apply();                                       /* (kept with the project: the autosave sees it changed) */
+    }
+}
+COLD static void smk_test_buttons(void)
+{
+    static const char *const BN[14] = { "OCTAVE-", "OCTAVE+", "FX", "SCALE", "CHORD", "NOTE REPEAT", "PARA", "GLOBE", "PATCH", "BT",
+                                        "ARP", "SEQ", "SEQ PLAY", "SEQ REC" };
+    uint32_t rel, pr = panel_button_edges(&rel);
+    for (int b = 0; b < 14; b++) if (pr & (1u << b)) { char m[24]; *put_s(put_s(m, "BUTTON "), BN[b]) = 0; say(m); t_input = time_ticks(); }
+}
+COLD static void smk_view(ui_view *v, int pg)
+{
+    char *p;
+    if (pg == PG_SMKSET) {
+        v->page = UI_GENERIC;
+        put_s(v->page_name, "SMK-37 · < > TOGETHER: TEST")[0] = 0;
+        knob(v, 0, "TOUCH", SMK_KV_NAME[smk_kv % KV_N], smk_kv * 20, 0);      /* (the keys' and pads' velocity) */
+        knob(v, 1, "PADS", SMK_SENS_NAME[smk_sens & 3], smk_sens * 33, 0);    /* (how firm a hit must be) */
+        knob(v, 2, "LIGHT", SMK_LIGHT_NAME[smk_light % 3], 100 - smk_light * 40, 0);
+        knob(v, 3, "KNOBS", smk_krev ? "REVERSE" : "NORMAL", smk_krev * 100, 0);
+        return;
+    }
+    /* PANEL TEST: the 16 pads as the tiles (their force as a bar, lit while held), the faders as the dials; the line: the last
+     * key or pad and its velocity, the wheels and the pedal as read */
+    v->page = UI_LAYER; v->cols = 0; v->title_col = RGB(255, 210, 60);
+    put_s(v->title, "TEST")[0] = 0;                          /* (short: the two lines of readings beside it) */
+    int h = smk_last_hit(), hk = h >> 8, hv = h & 255;
+    p = v->sub;
+    if (!h) p = put_s(p, "PLAY A KEY");
+    else if (hk >= 0x40) { p = put_s(p, "PAD "); p = put_u(p, (uint32_t)(hk - 0x40 + 1)); }
+    else { int n = 48 + hk; p = put_s(p, "KEY "); p = put_s(p, harm_note_name[n % 12]); p = put_u(p, (uint32_t)(n / 12 - 1)); }
+    if (h) { p = put_s(p, " V"); p = put_u(p, (uint32_t)hv); }
+    p = put_s(p, " \xC2\xB7 W");                            /* (" · ": the line's second half below its first) */ p = put_u(p, (uint32_t)smk_wheel_raw(0)); p = put_s(p, " M"); p = put_u(p, (uint32_t)smk_wheel_raw(1));
+    p = put_s(p, " P"); p = put_u(p, (uint32_t)smk_pedal_raw()); *p = 0;
+    for (int i = 0; i < 16; i++) {
+        char b[8]; int r = smk_pad_raw(i); *put_u(b, (uint32_t)r) = 0;
+        tile(v, i, b, smk_pad_held(i) ? T_WHITE : T_DIM, TF_LEVEL, RGB(255, 210, 60));
+        v->tile[i].lvl = (uint8_t)(r * 100 / 1023);
+    }
+    for (int f = 0; f < 4; f++) {
+        static const char *const FN[4] = { "FADER 1", "FADER 2", "FADER 3", "FADER 4" };
+        int x = smk_fader(f);
+        if (x < 0) knob(v, f, FN[f], "-", 0, 0); else knob_n(v, f, FN[f], x, x * 100 / 127);
+    }
+}
 /* ---- the extra buttons */
 static uint8_t smk_drumpads;
 COLD static void smk_xbtns(void)
@@ -227,10 +310,24 @@ COLD static void smk_xbtns(void)
     uint32_t rel, pr = smk_xbutton_edges(&rel);
     if (!(pr | rel)) return;
     t_input = time_ticks();
+    if (sticky == PG_SMKTEST) {                                   /* (PANEL TEST: the extra buttons named) */
+        static const char *const XN[4] = { "KNOB BANK", "FADER BANK", "<", ">" };
+        for (int b = 0; b < 4; b++) if (pr & (1u << b)) { char m[24]; *put_s(put_s(m, "BUTTON "), XN[b]) = 0; say(m); }
+        pr &= ~((1u << SB_KNOB_BANK) | (1u << SB_FADER_BANK)); rel &= ~(1u << SB_KNOB_BANK);
+    }
     if (pr & (1u << SB_FADER_BANK)) smk_fader_bank((held_btn & (1u << BTN_OCT_DOWN)) ? -1 : 1);
     if (pr & (1u << SB_KNOB_BANK)) smk_kb_used = 0;
     if ((rel & (1u << SB_KNOB_BANK)) && !smk_kb_used) { smk_drumpads = (uint8_t)!smk_drumpads; say(smk_drumpads ? "PADS: THE DRUM KIT" : "PADS: THE WHITE KEYS"); }
-    int d = (pr & (1u << SB_LEFT)) ? -1 : (pr & (1u << SB_RIGHT)) ? 1 : 0;
+    {   /* < and > together: the SMK-37's pages; alone, each acts when let go (the first of a pair does nothing) */
+        static uint8_t combo;
+        const uint32_t LR = (1u << SB_LEFT) | (1u << SB_RIGHT);
+        uint32_t xh = smk_xbuttons();
+        if ((pr & LR) && (xh & LR) == LR) { combo = 1; smk_pages_next(); return; }
+        if (!(rel & LR)) return;
+        if (combo) { if (!(xh & LR)) combo = 0; return; }
+    }
+    if (sticky == PG_SMKTEST) return;                            /* (PANEL TEST: named, nothing done) */
+    int d = (rel & (1u << SB_LEFT)) ? -1 : (rel & (1u << SB_RIGHT)) ? 1 : 0;
     if (!d) return;
     if (lay_on(BTN_SEQ) || sticky == PG_STEPS || notes_on()) {   /* the step page */
         int np = page + d, steps = Q.t[trk].pat[Q.t[trk].cur].steps;

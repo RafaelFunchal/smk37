@@ -32,6 +32,14 @@ void smk_pad_dim(int lvl);                 /* PAD LIGHTS: 0 full, 1 half, 2 a qu
 void smk_pads_flush(void);                 /* (main loop) the pads' frame sent when it changed and the screen's bus is free */
 void smk_pad_mode(int drums);              /* 1: DRUM PADS, a hit goes to smk_ext_take as (0x40 + pad) << 8 | velocity */
 int smk_pad_held(int pad);                 /* pad 0..15 held now */
+void smk_pad_sens(int lvl);                /* PAD SENS: 0 LOW, 1 MID (the default), 2 HIGH, 3 MAX: how firm a hit must be */
+void smk_knob_dir(int reversed);           /* KNOBS: 1 every knob the other way (if a unit turns them backwards) */
+/* (PANEL TEST) what the panel reads now: a pad's force 0..1023, a wheel (0 pitch, 1 mod) and the pedal raw, the last
+ * key (0..36) or pad (0x40 + pad) << 8 | its velocity */
+int smk_pad_raw(int pad);
+int smk_wheel_raw(int w);
+int smk_pedal_raw(void);
+int smk_last_hit(void);
 /* the factory calibration, read once the flash is open (never written): 1 the unit's curves, 0 the defaults */
 int smk_trim_read(void);
 /* the panel's diagnostics: frames scanned, conversions read / missed */

@@ -5,7 +5,7 @@
 # area inlined (one file, opens from the disk too). It installs through m-bootloader's MIDI MODE only.
 #   mkpage.py AREA VERSION OUT.html [BOARD [PIANO]]
 # BOARD: fm1 (the default) or smk37; the SMK-37's page also carries the piano bank (tools/mkpiano.py), written in
-# clear at flash 0x78000, and speaks of the SMK-37's keys (m-bootloader's menu: < > SEQ PLAY SEQ REC).
+# clear at flash 0x7C000 (its sixth argument), and speaks of the SMK-37's keys (m-bootloader's menu: < > SEQ PLAY SEQ REC).
 import base64, re, sys
 area, version, out = sys.argv[1], sys.argv[2], sys.argv[3]
 board = sys.argv[4] if len(sys.argv) > 4 else "fm1"
@@ -48,7 +48,8 @@ def smk_words(t):
 
 if board == "smk37":
     t = smk_words(t)
-t = t.replace("__FWPKG__", js).replace("__VERSION__", version).replace("__BOARD__", board)
+piano_at = sys.argv[6] if len(sys.argv) > 6 else "0x7C000"     # (the piano's flash address: hal/smk37/smk37.h SMK_PIANO_AT)
+t = t.replace("__FWPKG__", js).replace("__VERSION__", version).replace("__BOARD__", board).replace("__PIANO_AT__", piano_at)
 t = t.replace("__PIANO__", base64.b64encode(open(sys.argv[5], "rb").read()).decode() if board == "smk37" else "")
 t = t.replace("__MARK__", base64.b64encode(open("web/sloop-mark.png", "rb").read()).decode())   # (the sailboat in its dial, square)
 t = t.replace("__HERO__", base64.b64encode(open("web/inst-hero.webp", "rb").read()).decode())

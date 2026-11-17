@@ -57,14 +57,19 @@ import struct; b=open('$O/ram.bin','rb').read(); b+=bytes(-len(b)%4); print(hex(
 "$TC/llvm-objcopy" -O binary $O/app.elf $O/app.bin
 # the area: the firmware, then the sample bank at flash 0x48000 (assets/samples.bin, tools/mksamples.py); the projects
 # begin at 0x7A000 (app/store.h): the area, from 0x4000, must end before
+if [ $BOARD = smk37 ]; then   # (the SMK-37: the bank 16 KB later, flash 0x4C000; the area ends before the piano, 0x7C000: hal/smk37/smk37.h)
+  MKFW_BANK_AT=0x48000 MKFW_AREA_END=0x78000 python3 tools/mkfw.py $O/app.bin $O/fw.area assets/samples.bin
+  test $(stat -c%s $O/fw.area) -le $((0x7C000 - 0x4000)) || { echo "the area would run into the piano (0x7C000)"; exit 1; }
+else
 python3 tools/mkfw.py $O/app.bin $O/fw.area assets/samples.bin
 test $(stat -c%s $O/fw.area) -le $((0x78000 - 0x4000)) || { echo "the area would run into your FM6 bank and SYN kits (0x78000, app/xbank.h)"; exit 1; }
+fi
 "$TC/llvm-size" $O/ram.elf | tail -1
 # the installer page: through m-bootloader's MIDI MODE only (3.3.1: the way straight from SLOOP 2.8 is gone)
 if [ $BOARD = smk37 ]; then
-  # the SMK-37's: the piano bank too (tools/mkpiano.py: flash 0x78000 .. below 0xC0000, in clear)
-  python3 tools/mkpiano.py --out $O/piano.img
-  python3 tools/mkpage.py $O/fw.area "3.3.7" $O/installer-smk37.html smk37 $O/piano.img
+  # the SMK-37's: the piano bank too (tools/mkpiano.py: flash 0x7C000 .. below 0xC0000, in clear)
+  python3 tools/mkpiano.py --base 0x7C000 --out $O/piano.img
+  python3 tools/mkpage.py $O/fw.area "3.3.7" $O/installer-smk37.html smk37 $O/piano.img 0x7C000
   node tests/install_sim.js $O/installer-smk37.html $O/fw.area smk37 $O/piano.img | tail -1
   echo "SMK-37: $O/installer-smk37.html"; exit 0
 fi
